@@ -1,5 +1,8 @@
 # mc-server
  A minecraft server runner.
+```
+java -Xmx8G -Xms4G -jar server.jar nogui
+```
 
 
 # Port Forwarding
