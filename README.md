@@ -4,6 +4,5 @@
 
 # Port Forwarding
 Allow firewall
-```sudo ufw allow 25565/tcp
-```
+```sudo ufw allow 25565/tcp```
 
