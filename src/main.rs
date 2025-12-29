@@ -1,39 +1,19 @@
-mod commands;
-mod config;
-mod logs;
+use std::env;
 
-use clap::{Parser, Subcommand};
+mod app;
+mod server;
+mod state;
 
-#[derive(Parser)]
-#[command(name = "mc-manager")]
-#[command(about = "Minecraft Server Manager CLI", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
+use app::McManagerApp;
+
+fn main() -> eframe::Result<()> {
+    let options = eframe::NativeOptions::default();
+
+    env::set_current_dir("servers").expect("Error changing dir.");
+    eframe::run_native(
+        "Minecraft Server Manager",
+        options,
+        Box::new(|_| Ok(Box::new(McManagerApp::new()))),
+    )
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    Server {
-        #[arg(value_enum)]
-        action: commands::server::ServerAction,
-    },
-    Backup {
-        #[arg(value_enum)]
-        action: commands::backup::BackupAction,
-    },
-    Logs {
-        #[arg(short, long)]
-        tail: bool,
-    },
-}
-
-fn main() {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Server { action } => commands::server::handle_server(action),
-        Commands::Backup { action } => commands::backup::handle_backup(action),
-        Commands::Logs { tail } => logs::show_logs(tail),
-    }
-}
