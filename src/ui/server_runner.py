@@ -3,7 +3,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-class ServerPopup(Adw.Window):
+class ServerRunnerWindow(Adw.Window):
     def __init__(self, parent, server_folder, **kwargs):
         super().__init__(**kwargs)
         

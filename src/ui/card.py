@@ -1,8 +1,9 @@
 from gi.repository import Adw, Gtk
 import subprocess
+import shutil
 from pathlib import Path
-from ui.server_editor import ServerEditorDialog
-from ui.server_popup import ServerPopup
+from ui.server_editor import ServerEditorWindow
+from ui.server_runner import ServerRunnerWindow
 
 class ServerCard(Adw.PreferencesGroup):
     def __init__(self, server_folder, on_server_changed=None, **kwargs):
@@ -62,6 +63,15 @@ class ServerCard(Adw.PreferencesGroup):
         # Buttons box
         buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         
+        # Delete button
+        delete_btn = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+        delete_btn.set_tooltip_text("Delete Server")
+        delete_btn.set_size_request(32, 32)
+        delete_btn.add_css_class("circular")
+        delete_btn.add_css_class("destructive-action")
+        delete_btn.connect("clicked", self.on_delete_clicked)
+        buttons_box.append(delete_btn)
+
         # Open folder button
         folder_btn = Gtk.Button.new_from_icon_name("folder-open-symbolic")
         folder_btn.set_tooltip_text("Open Server Folder")
@@ -77,6 +87,7 @@ class ServerCard(Adw.PreferencesGroup):
         settings_btn.add_css_class("circular")
         settings_btn.connect("clicked", self.on_settings_clicked)
         buttons_box.append(settings_btn)
+        
         
         top_row.append(buttons_box)
         main_box.append(top_row)
@@ -107,12 +118,12 @@ class ServerCard(Adw.PreferencesGroup):
     
     def on_start_clicked(self, button):
         """Open server console popup"""
-        popup = ServerPopup(parent=self.get_root(), server_folder=self.server_folder)
+        popup = ServerRunnerWindow(parent=self.get_root(), server_folder=self.server_folder)
         popup.present()
     
     def on_settings_clicked(self, button):
         """Open server properties editor"""
-        dialog = ServerEditorDialog(parent=self.get_root(), server_folder=self.server_folder)
+        dialog = ServerEditorWindow(parent=self.get_root(), server_folder=self.server_folder)
         dialog.connect("destroy", self.on_settings_closed)
         dialog.present()
     
@@ -126,6 +137,44 @@ class ServerCard(Adw.PreferencesGroup):
     def on_folder_clicked(self, button):
         """Open server folder in file manager"""
         subprocess.Popen(["xdg-open", str(self.server_folder)])
+    
+    def on_delete_clicked(self, button):
+        """Show confirmation dialog before deleting server"""
+        # Create confirmation dialog
+        dialog = Adw.MessageDialog.new(self.get_root(), 
+                                       "Delete Server?", 
+                                       f"Are you sure you want to delete '{self.server_name}'?\n\nThis action cannot be undone.")
+        
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        
+        dialog.connect("response", self.on_delete_confirmed)
+        dialog.present()
+    
+    def on_delete_confirmed(self, dialog, response):
+        """Handle delete confirmation"""
+        dialog.destroy()
+        
+        if response == "delete":
+            try:
+                # Delete the server folder and all its contents
+                shutil.rmtree(self.server_folder)
+                
+                # Notify parent to refresh server list
+                if self.on_server_changed:
+                    self.on_server_changed()
+                    
+            except Exception as e:
+                # Show error dialog if deletion fails
+                error_dialog = Adw.MessageDialog.new(self.get_root(),
+                                                     "Delete Failed",
+                                                     f"Failed to delete server: {str(e)}")
+                error_dialog.add_response("ok", "OK")
+                error_dialog.set_default_response("ok")
+                error_dialog.present()
     
     def refresh(self):
         """Refresh card data"""

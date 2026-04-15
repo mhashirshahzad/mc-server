@@ -1,7 +1,7 @@
 from gi.repository import Adw, Gtk, GLib
 from pathlib import Path
 
-class JavaSettingsDialog(Adw.Window):
+class JavaEditorWindow(Adw.Window):
     def __init__(self, parent, server_folder, **kwargs):
         super().__init__(**kwargs)
         

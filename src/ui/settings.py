@@ -1,7 +1,7 @@
 from gi.repository import Adw, Gtk
 import os
 
-class SettingsDialog(Adw.PreferencesWindow):
+class SettingsWindow(Adw.Window):
     def __init__(self, parent, **kwargs):
         super().__init__(**kwargs)
         
@@ -11,7 +11,26 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.set_transient_for(parent)
         self.set_modal(True)
         
-        # Create preferences page
+        # Main layout
+        self.content = Adw.ToolbarView()
+        
+        # Header bar
+        header = Adw.HeaderBar()
+        header.set_title_widget(Gtk.Label(label="Settings"))
+        
+        # Save button
+        save_button = Gtk.Button(label="Save")
+        save_button.add_css_class("suggested-action")
+        save_button.connect("clicked", self.on_save_clicked)
+        header.pack_end(save_button)
+        
+        self.content.add_top_bar(header)
+        
+        # Scrolled window for preferences
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        
+        # Preferences page
         preferences_page = Adw.PreferencesPage()
         preferences_group = Adw.PreferencesGroup(title="Server Settings")
         preferences_page.add(preferences_group)
@@ -20,7 +39,6 @@ class SettingsDialog(Adw.PreferencesWindow):
         self.server_dir_row = Adw.EntryRow(title="Minecraft Server Directory")
         self.server_dir_row.set_text(self.get_server_dir())
         self.server_dir_row.set_tooltip_text("Directory where server JAR files are stored")
-        self.server_dir_row.connect("changed", self.on_server_dir_changed)
         preferences_group.add(self.server_dir_row)
         
         # Browse button
@@ -30,7 +48,10 @@ class SettingsDialog(Adw.PreferencesWindow):
         browse_row.add_suffix(browse_button)
         preferences_group.add(browse_row)
         
-        self.add(preferences_page)
+        scrolled.set_child(preferences_page)
+        self.content.set_content(scrolled)
+        
+        self.set_content(self.content)
     
     def get_config_dir(self):
         """Get the config directory"""
@@ -63,15 +84,22 @@ class SettingsDialog(Adw.PreferencesWindow):
         server_dir = self.server_dir_row.get_text()
         settings_file = self.get_settings_file()
         
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(settings_file), exist_ok=True)
+        
         with open(settings_file, 'w') as f:
             f.write(server_dir)
     
-    def on_server_dir_changed(self, entry):
-        """Save when directory changes"""
+    def on_save_clicked(self, button):
+        """Handle save button click"""
         self.save_server_dir()
+        
         # Notify parent to refresh server list
         if self.parent and hasattr(self.parent, 'refresh_server_list'):
             self.parent.refresh_server_list()
+        
+        # Close the dialog after saving
+        self.destroy()
     
     def on_browse_clicked(self, button):
         """Open file chooser dialog"""
@@ -87,7 +115,7 @@ class SettingsDialog(Adw.PreferencesWindow):
         )
         
         dialog.connect("response", self.on_folder_selected)
-        dialog.show()
+        dialog.present()
     
     def on_folder_selected(self, dialog, response):
         if response == Gtk.ResponseType.ACCEPT:

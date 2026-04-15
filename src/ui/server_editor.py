@@ -1,8 +1,9 @@
 from gi.repository import Adw, Gtk
 import os
 from pathlib import Path
+from ui.java_editor import JavaEditorWindow
 
-class ServerEditorDialog(Adw.Window):
+class ServerEditorWindow(Adw.Window):
     def __init__(self, parent, server_folder, **kwargs):
         super().__init__(**kwargs)
         
@@ -130,8 +131,7 @@ class ServerEditorDialog(Adw.Window):
 
     def on_java_settings_clicked(self, button):
         """Open Java settings dialog"""
-        from ui.java_editor import JavaSettingsDialog
-        dialog = JavaSettingsDialog(parent=self, server_folder=self.server_folder)
+        dialog = JavaEditorWindow(parent=self, server_folder=self.server_folder)
         dialog.present()
 
     def create_basic_settings(self):

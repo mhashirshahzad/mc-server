@@ -25,7 +25,7 @@ setup:
 	python3 -m venv $(VENV)
 	@echo -e "$(YELLOW)Installing dependencies...$(NC)"
 	$(PIP) install --upgrade pip
-	$(PIP) install pygobject 
+	$(PIP) install pygobject requests
 	@echo -e "$(YELLOW)Installing LSP...$(NC)"
 	$(PIP) install python-lsp-server
 	@echo -e "$(GREEN)✅ Setup complete! Run 'make run'$(NC)"

@@ -1,8 +1,9 @@
 from gi.repository import Adw, Gtk
 from pathlib import Path
 import os
-from ui.settings import SettingsDialog
+from ui.settings import SettingsWindow
 from ui.card import ServerCard
+from ui.server_downloader import DownloadsWindow  # Make sure this import is correct
 
 class GrassyWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
@@ -35,12 +36,19 @@ class GrassyWindow(Adw.ApplicationWindow):
         settings_button.connect("clicked", self.on_settings_clicked)
         header.pack_start(settings_button)
 
+        # Download button (right side) - Plus sign
+        download_button = Gtk.Button.new_from_icon_name("list-add-symbolic")
+        download_button.set_tooltip_text("Download Minecraft server")
+        download_button.add_css_class("suggested-action")
+        download_button.connect("clicked", self.on_download_clicked)
+        header.pack_end(download_button)
+
         # Scan button (right side)
         scan_button = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
         scan_button.set_tooltip_text("Scan for servers")
         scan_button.connect("clicked", self.on_scan_clicked)
         header.pack_end(scan_button)
-
+        
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(header)
         toolbar.set_content(scrolled)
@@ -118,21 +126,31 @@ class GrassyWindow(Adw.ApplicationWindow):
         label.add_css_class("title-4")
         info_box.append(label)
         
-        sublabel = Gtk.Label(label=f"Create a folder in:\n{servers_dir}\nand place server.jar inside it")
+        sublabel = Gtk.Label(label=f"Create a folder in:\n{servers_dir}\nand place server.jar inside it\n\nor click the + button to download a server")
         sublabel.set_halign(Gtk.Align.CENTER)
         sublabel.add_css_class("dim-label")
         info_box.append(sublabel)
         
+        # Add download button to empty state
+        download_button = Gtk.Button(label="Download Server")
+        download_button.add_css_class("suggested-action")
+        download_button.connect("clicked", self.on_download_clicked)
+        info_box.append(download_button)
+        
         self.server_list.append(info_box)
     
-    
     def on_settings_clicked(self, button):
-        """Open settings dialog"""
-        dialog = SettingsDialog(parent=self)
+        """Open settings Window"""
+        dialog = SettingsWindow(parent=self)
         dialog.connect("destroy", lambda d: self.refresh_server_list())
         dialog.present()
 
+    def on_download_clicked(self, button):
+        """Open Downloads Window"""
+        window = DownloadsWindow(parent=self)
+        window.connect("destroy", lambda d: self.refresh_server_list())
+        window.present()
+
     def on_scan_clicked(self, button):
-        
         """Manually scan for servers"""
         self.refresh_server_list()
