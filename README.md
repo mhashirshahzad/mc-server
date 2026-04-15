@@ -2,14 +2,20 @@
  A beautiful and easy-to-use Minecraft server manager built with Python and GTK4/libadwaita.
 
 ### Main window
-![Main Window][assets/main_window.png]
+
+<p align="center">
+  <img src="assets/main_window.png" width="200" alt="Grassy Logo">
+</p>
 
 ### Settings
-![Settings][assets/settings.png]
+<p align="center">
+  <img src="assets/settings.png" width="200" alt="Grassy Logo">
+</p>
 
 ### Server Settings
-![Server Settings][assets/server_settings.png]
-
+<p align="center">
+  <img src="assets/server_settings.png" width="200" alt="Grassy Logo">
+</p>
 ### Dependencies
 Arch:
 
