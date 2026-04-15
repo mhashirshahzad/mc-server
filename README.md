@@ -1,43 +1,28 @@
 # mc-server
  A minecraft server runner.
+
+### Dependencies
+Arch:
+
+```bash
+sudo pacman -S python-gobject gtk4 libadwaita gobject-introspection make
 ```
-java -Xmx8G -Xms4G -jar server.jar nogui
+Fedora:
+
+```bash
+sudo dnf install python3-gobject gtk4 libadwaita
 ```
 
-# DuckDNS
-1. Make directory
+Debian/Ubuntu:
+```bash
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 libadwaita-1-0
 ```
-mkdir duckdns
-cd duckdns
-nvim duck.sh
-```
-2. Add to duck.sh
-```
-echo url="https://www.duckdns.org/update?domains=mcserverhashir&token=bdcbebe1-cd6c-48f7-90b3-ace359bfb4e8&ip=" | curl -k -o ~/duckdns/duck.log -K -
-```
-3. Add perms to duck.sh
-```
-chmod 700 duck.sh
-```
-4. Cron job
-```
-crontab -e
-```
-Add to bottom of the cron job
-```
-*/5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
-```
-5. Run the job
-```
-./duck.sh
-```
-6. Join Minecraft
-```
-mcserverhashir.duckdns.org:25565
-```
-# Port Forwarding
-Allow firewall
-```
-sudo ufw allow 25565/tcp
-```
+### Running
 
+```bash
+git clone https://github.com/mhashirshahzad/grassy
+
+cd grassy
+
+make run
+```
