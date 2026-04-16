@@ -2,6 +2,7 @@ VENV = venv
 PYTHON = $(VENV)/bin/python3
 PIP = $(VENV)/bin/pip3
 BINARY_NAME = grassy
+BINARY_VERSION = 1.0.0
 INSTALL_PATH = /usr/local/bin
 DESKTOP_PATH = $(HOME)/.local/share/applications
 
@@ -25,7 +26,7 @@ setup:
 	python3 -m venv $(VENV)
 	@echo -e "$(YELLOW)Installing dependencies...$(NC)"
 	$(PIP) install --upgrade pip
-	$(PIP) install pygobject requests
+	$(PIP) install pygobject requests appdirs
 	@echo -e "$(YELLOW)Installing LSP...$(NC)"
 	$(PIP) install python-lsp-server
 	@echo -e "$(GREEN)✅ Setup complete! Run 'make run'$(NC)"

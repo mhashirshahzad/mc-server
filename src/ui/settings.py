@@ -1,5 +1,6 @@
 from gi.repository import Adw, Gtk
 import os
+import appdirs
 
 class SettingsWindow(Adw.Window):
     def __init__(self, parent, **kwargs):
@@ -55,7 +56,8 @@ class SettingsWindow(Adw.Window):
     
     def get_config_dir(self):
         """Get the config directory"""
-        config_dir = os.path.expanduser("~/.config/grassy")
+
+        config_dir = appdirs.user_config_dir("grassy")
         os.makedirs(config_dir, exist_ok=True)
         return config_dir
     
@@ -65,9 +67,10 @@ class SettingsWindow(Adw.Window):
     
     def get_server_dir(self):
         """Get the server directory from settings"""
-        settings_file = self.get_settings_file()
-        default_dir = os.path.expanduser("~/.local/share/grassy/servers")
-        
+        settings_file = self.get_settings_file()        
+
+        data_dir = appdirs.user_data_dir("grassy")
+        default_dir = os.path.join(data_dir, "servers")
         if os.path.exists(settings_file):
             try:
                 with open(settings_file, 'r') as f:

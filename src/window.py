@@ -1,6 +1,7 @@
 from gi.repository import Adw, Gtk
 from pathlib import Path
 import os
+import appdirs
 from ui.settings import SettingsWindow
 from ui.card import ServerCard
 from ui.server_downloader import DownloadsWindow  # Make sure this import is correct
@@ -60,8 +61,10 @@ class GrassyWindow(Adw.ApplicationWindow):
     
     def get_servers_dir(self):
         """Get servers directory from settings"""
-        settings_file = os.path.expanduser("~/.config/grassy/settings.txt")
-        default_dir = os.path.expanduser("~/.local/share/grassy/servers")
+        config_dir = appdirs.user_config_dir("grassy")
+        settings_file = os.path.join(config_dir, "settings.txt")
+        data_dir = appdirs.user_data_dir("grassy")
+        default_dir = os.path.join(data_dir, "servers")
         
         if os.path.exists(settings_file):
             try:
