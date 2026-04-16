@@ -1,65 +1,106 @@
-name: Build Grassy
+name: Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
-
-  # ---------------- LINUX ----------------
-  build-linux:
+  build-appimage:
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y python3 python3-pip python3-venv \
-                              libgtk-4-dev libadwaita-1-dev \
-                              gir1.2-gtk-4.0 gir1.2-adw-1
-
-      - name: Install appimage-builder
-        run: |
-          pip install appimage-builder
-
-      - name: Build AppImage
-        run: |
-          appimage-builder --recipe AppImageBuilder.yml
-
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: grassy-linux
-          path: "*.AppImage"
-
-  # ---------------- WINDOWS ----------------
-  build-windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.10'
+      
+      - name: Install appimage-builder
+        run: pip install appimage-builder
+      
+      - name: Build AppImage
+        run: |
+          cat > AppImageBuilder.yml << 'EOF'
+          version: 1
+          AppDir:
+            path: AppDir
+            app_info:
+              id: grassy
+              name: Grassy
+              icon: grassy
+              version: "latest"
+              exec: usr/bin/grassy
+            apt:
+              arch: amd64
+              allow_unauthenticated: true
+              sources:
+                - sourceline: "deb http://archive.ubuntu.com/ubuntu jammy main universe"
+              include:
+                - python3
+                - python3-pip
+                - python3-gi
+                - libgtk-4-1
+                - gir1.2-gtk-4.0
+                - libadwaita-1-0
+                - gir1.2-adw-1
+            files:
+              include:
+                - src/
+            runtime:
+              env:
+                PYTHONPATH: "/usr/lib/python3/dist-packages"
+            after_bundle:
+              - pip3 install --target=AppDir/usr/lib/python3/dist-packages requests appdirs
+              - |
+                cat > AppDir/usr/bin/grassy << 'SCRIPT'
+                #!/bin/bash
+                HERE="$(dirname "$(readlink -f "$0")")"
+                exec python3 "${HERE}/../src/main.py" "$@"
+                SCRIPT
+              - chmod +x AppDir/usr/bin/grassy
+          AppImage:
+            arch: x86_64
+          EOF
+          
+          appimage-builder --recipe AppImageBuilder.yml
+          
+          # Rename output
+          mv *.AppImage Grassy-latest-x86_64.AppImage || true
+      
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: Grassy-AppImage
+          path: Grassy-*.AppImage
 
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
       - name: Install dependencies
         run: |
-          pip install pyinstaller pygobject requests appdirs
-
+          pip install pyinstaller requests appdirs
+      
       - name: Build EXE
         run: |
-          pyinstaller --onefile --windowed --name grassy src/main.py
-
+          pyinstaller --onefile `
+            --windowed `
+            --name="Grassy-latest-windows" `
+            --add-data "src;src" `
+            --hidden-import=requests `
+            --hidden-import=appdirs `
+            src/main.py
+      
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: grassy-windows
-          path: dist/grassy.exe
+          name: Grassy-Windows-EXE
+          path: dist/Grassy-*.exe
