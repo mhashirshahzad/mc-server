@@ -1,6 +1,10 @@
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gtk, Gdk, GLib
 import os
 import appdirs
+import socket
+import subprocess
+import re
+
 
 class SettingsWindow(Adw.Window):
     def __init__(self, parent, **kwargs):
@@ -8,9 +12,11 @@ class SettingsWindow(Adw.Window):
         
         self.parent = parent
         self.set_title("Settings")
-        self.set_default_size(600, 400)
+        self.set_default_size(600, 500)
         self.set_transient_for(parent)
         self.set_modal(True)
+        
+        self.ip_revealed = False
         
         # Main layout
         self.content = Adw.ToolbarView()
@@ -33,30 +39,205 @@ class SettingsWindow(Adw.Window):
         
         # Preferences page
         preferences_page = Adw.PreferencesPage()
-        preferences_group = Adw.PreferencesGroup(title="Server Settings")
-        preferences_page.add(preferences_group)
+        
+        # Server Settings group
+        server_group = Adw.PreferencesGroup(title="Server Settings")
+        preferences_page.add(server_group)
         
         # Server directory setting
         self.server_dir_row = Adw.EntryRow(title="Minecraft Server Directory")
         self.server_dir_row.set_text(self.get_server_dir())
         self.server_dir_row.set_tooltip_text("Directory where server JAR files are stored")
-        preferences_group.add(self.server_dir_row)
+        server_group.add(self.server_dir_row)
         
         # Browse button
         browse_row = Adw.ActionRow(title="Browse for directory")
         browse_button = Gtk.Button(label="Browse...")
         browse_button.connect("clicked", self.on_browse_clicked)
         browse_row.add_suffix(browse_button)
-        preferences_group.add(browse_row)
+        server_group.add(browse_row)
+        
+        # Network Settings group
+        network_group = Adw.PreferencesGroup(title="Network Information")
+        preferences_page.add(network_group)
+        
+        # Local IP row
+        local_ip_row = Adw.ActionRow(title="Local IP Address")
+        self.local_ip_label = Gtk.Label(label=self.get_local_ip())
+        self.local_ip_label.set_halign(Gtk.Align.END)
+        self.local_ip_label.set_selectable(True)
+        local_ip_row.add_suffix(self.local_ip_label)
+        network_group.add(local_ip_row)
+        
+        # Public IP row (with reveal button)
+        public_ip_row = Adw.ActionRow(title="Public IP Address")
+        public_ip_row.set_subtitle("Click the eye to reveal your public IP")
+        
+        # Create a box to hold the IP label and buttons
+        ip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        ip_box.set_halign(Gtk.Align.END)
+        
+        # IP label (hidden by default)
+        self.public_ip_label = Gtk.Label(label="••••••••")
+        self.public_ip_label.set_selectable(True)
+        ip_box.append(self.public_ip_label)
+        
+        # Reveal button (eye icon)
+        self.reveal_button = Gtk.Button()
+        self.reveal_button.set_icon_name("view-reveal-symbolic")
+        self.reveal_button.set_tooltip_text("Show public IP")
+        self.reveal_button.set_valign(Gtk.Align.CENTER)
+        self.reveal_button.connect("clicked", self.on_reveal_ip_clicked)
+        ip_box.append(self.reveal_button)
+        
+        # Copy button
+        self.copy_button = Gtk.Button()
+        self.copy_button.set_icon_name("edit-copy-symbolic")
+        self.copy_button.set_tooltip_text("Copy IP address")
+        self.copy_button.set_valign(Gtk.Align.CENTER)
+        self.copy_button.set_sensitive(False)  # Disabled until IP is revealed
+        self.copy_button.connect("clicked", self.on_copy_ip_clicked)
+        ip_box.append(self.copy_button)
+        
+        # Refresh button
+        refresh_button = Gtk.Button()
+        refresh_button.set_icon_name("view-refresh-symbolic")
+        refresh_button.set_tooltip_text("Refresh IP address")
+        refresh_button.set_valign(Gtk.Align.CENTER)
+        refresh_button.connect("clicked", self.on_refresh_ip_clicked)
+        ip_box.append(refresh_button)
+        
+        public_ip_row.add_suffix(ip_box)
+        network_group.add(public_ip_row)
+        
+        # Store the actual public IP
+        self.public_ip = None
+        self.load_public_ip()
         
         scrolled.set_child(preferences_page)
         self.content.set_content(scrolled)
         
         self.set_content(self.content)
     
+    def get_local_ip(self):
+        """Get the local IP address of the current system"""
+        try:
+            # Create a socket to determine the local IP
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            return local_ip
+        except Exception:
+            try:
+                # Fallback method
+                hostname = socket.gethostname()
+                local_ip = socket.gethostbyname(hostname)
+                return local_ip
+            except Exception:
+                return "Unable to detect"
+    
+    def get_public_ip(self):
+        """Get the public IP address using external services"""
+        try:
+            # Try multiple services for redundancy
+            services = [
+                "https://api.ipify.org",
+                "https://icanhazip.com",
+                "https://checkip.amazonaws.com"
+            ]
+            
+            import requests
+            for service in services:
+                try:
+                    response = requests.get(service, timeout=5)
+                    if response.status_code == 200:
+                        ip = response.text.strip()
+                        if re.match(r'^\d+\.\d+\.\d+\.\d+$', ip):
+                            return ip
+                except:
+                    continue
+            
+            return "Unable to detect"
+        except Exception:
+            return "Unable to detect"
+    
+    def load_public_ip(self):
+        """Load public IP in background thread"""
+        import threading
+        
+        def fetch_ip():
+            ip = self.get_public_ip()
+            self.public_ip = ip
+            # Don't auto-reveal, just store it
+        
+        thread = threading.Thread(target=fetch_ip, daemon=True)
+        thread.start()
+    
+    def on_reveal_ip_clicked(self, button):
+        """Toggle IP visibility"""
+        if not self.ip_revealed:
+            # Reveal the IP
+            if self.public_ip:
+                self.public_ip_label.set_label(self.public_ip)
+            else:
+                self.public_ip_label.set_label("Loading...")
+                # Try to get IP now if not loaded
+                import threading
+                def get_ip():
+                    ip = self.get_public_ip()
+                    self.public_ip = ip
+                    GLib.idle_add(lambda: self.public_ip_label.set_label(ip))
+                threading.Thread(target=get_ip, daemon=True).start()
+            
+            self.reveal_button.set_icon_name("view-conceal-symbolic")
+            self.reveal_button.set_tooltip_text("Hide public IP")
+            self.copy_button.set_sensitive(True)
+            self.ip_revealed = True
+        else:
+            # Hide the IP
+            self.public_ip_label.set_label("••••••••")
+            self.reveal_button.set_icon_name("view-reveal-symbolic")
+            self.reveal_button.set_tooltip_text("Show public IP")
+            self.copy_button.set_sensitive(False)
+            self.ip_revealed = False
+    
+    def on_copy_ip_clicked(self, button):
+        """Copy the public IP to clipboard"""
+        if self.public_ip and self.public_ip != "Unable to detect":
+            clipboard = Gdk.Display.get_default().get_clipboard()
+            clipboard.set(self.public_ip)
+            
+            # Show temporary notification
+            self.show_temp_notification("IP copied to clipboard!")
+    
+    def on_refresh_ip_clicked(self, button):
+        """Refresh the public IP address"""
+        import threading
+        
+        # Show loading state
+        if self.ip_revealed:
+            self.public_ip_label.set_label("Refreshing...")
+        else:
+            self.public_ip_label.set_label("••••••••")
+        
+        def refresh():
+            new_ip = self.get_public_ip()
+            self.public_ip = new_ip
+            if self.ip_revealed:
+                GLib.idle_add(lambda: self.public_ip_label.set_label(new_ip))
+            GLib.idle_add(lambda: self.show_temp_notification("IP address refreshed!"))
+        
+        thread = threading.Thread(target=refresh, daemon=True)
+        thread.start()
+    
+    def show_temp_notification(self, message):
+        """Show a temporary notification"""
+        toast = Adw.Toast(title=message, timeout=2)
+        self.parent.add_toast(toast) if hasattr(self.parent, 'add_toast') else None
+    
     def get_config_dir(self):
         """Get the config directory"""
-
         config_dir = appdirs.user_config_dir("grassy")
         os.makedirs(config_dir, exist_ok=True)
         return config_dir
