@@ -1,0 +1,65 @@
+name: Build Grassy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  # ---------------- LINUX ----------------
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3 python3-pip python3-venv \
+                              libgtk-4-dev libadwaita-1-dev \
+                              gir1.2-gtk-4.0 gir1.2-adw-1
+
+      - name: Install appimage-builder
+        run: |
+          pip install appimage-builder
+
+      - name: Build AppImage
+        run: |
+          appimage-builder --recipe AppImageBuilder.yml
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: grassy-linux
+          path: "*.AppImage"
+
+  # ---------------- WINDOWS ----------------
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller pygobject requests appdirs
+
+      - name: Build EXE
+        run: |
+          pyinstaller --onefile --windowed --name grassy src/main.py
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: grassy-windows
+          path: dist/grassy.exe

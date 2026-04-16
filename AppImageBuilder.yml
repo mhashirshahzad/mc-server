@@ -1,0 +1,64 @@
+
+version: 1
+
+AppDir:
+  path: AppDir
+
+  app_info:
+    id: grassy
+    name: Grassy
+    icon: grassy
+    version: "1.0.0"
+    exec: usr/bin/grassy
+    exec_args: "$@"
+
+  apt:
+    arch: amd64
+    sources:
+      - sourceline: "deb http://archive.ubuntu.com/ubuntu jammy main universe"
+    include:
+      # Python runtime
+      - python3
+      - python3-pip
+      - python3-gi
+
+      # GTK4 + libadwaita
+      - libgtk-4-1
+      - gir1.2-gtk-4.0
+      - libadwaita-1-0
+      - gir1.2-adw-1
+
+      # Required low-level deps (avoid runtime crashes)
+      - libcairo2
+      - libglib2.0-0
+      - libgirepository-1.0-1
+
+  files:
+    include:
+      - src/
+
+  runtime:
+    env:
+      # Ensures Python can find installed packages
+      PYTHONPATH: "/usr/lib/python3/dist-packages"
+
+  after_bundle:
+    - |
+      echo "Installing Python dependencies inside AppDir..."
+      ./AppDir/usr/bin/python3 -m pip install --no-cache-dir \
+        pygobject requests appdirs
+
+    - |
+      echo "Creating launcher..."
+      mkdir -p AppDir/usr/bin
+
+      cat > AppDir/usr/bin/grassy << 'EOF'
+      #!/usr/bin/env bash
+      HERE="$(dirname "$(readlink -f "$0")")"
+      exec "$HERE/python3" "$HERE/../src/main.py" "$@"
+      EOF
+
+      chmod +x AppDir/usr/bin/grassy
+
+AppImage:
+  arch: x86_64
