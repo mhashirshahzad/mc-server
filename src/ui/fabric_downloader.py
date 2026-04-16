@@ -1,294 +1,444 @@
 from gi.repository import Adw, Gtk, GLib
 import requests
-import os
 import threading
 from pathlib import Path
 import appdirs
+import re
 
 
 class FabricDownloaderWindow(Adw.Window):
     def __init__(self, parent, **kwargs):
         super().__init__(**kwargs)
-        
+
         self.parent = parent
         self.set_title("Download Fabric Server")
-        self.set_default_size(600, 400)
+        self.set_default_size(550, 500)
         self.set_transient_for(parent)
         self.set_modal(True)
+
+        # Data stores
+        self.all_mc_versions = []
+        self.loader_versions = []      # Loaders for selected MC version
+        self.installer_versions = []
         
-        # Main layout
+        self.selected_mc = None
+        self.selected_loader = None
+        self.selected_installer = None
+
+        # UI setup
         self.content = Adw.ToolbarView()
-        
-        # Header bar
+
+        # Header
         header = Adw.HeaderBar()
         header.set_title_widget(Gtk.Label(label="Download Fabric Server"))
-        
-        # Cancel button
+
         cancel_button = Gtk.Button(label="Cancel")
         cancel_button.connect("clicked", lambda x: self.destroy())
         header.pack_end(cancel_button)
-        
+
         self.content.add_top_bar(header)
-        
-        # Main content box
+
+        # Main layout
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         main_box.set_margin_top(24)
         main_box.set_margin_bottom(24)
         main_box.set_margin_start(24)
         main_box.set_margin_end(24)
-        
-        # Minecraft version selection
+
+        # --- Minecraft Version ---
         mc_label = Gtk.Label(label="Minecraft Version")
         mc_label.set_halign(Gtk.Align.START)
         mc_label.add_css_class("heading")
         main_box.append(mc_label)
-        
-        self.mc_version_entry = Adw.EntryRow()
-        self.mc_version_entry.set_text("1.20.4")
-        main_box.append(self.mc_version_entry)
-        
-        # Fabric loader version
+
+        self.mc_entry = Gtk.Entry()
+        self.mc_entry.set_placeholder_text("Loading Minecraft versions...")
+        self.mc_entry.set_sensitive(False)
+        main_box.append(self.mc_entry)
+
+        self.mc_spinner = Gtk.Spinner()
+        self.mc_spinner.set_visible(False)
+        main_box.append(self.mc_spinner)
+
+        # --- Separator ---
+        sep1 = Gtk.Separator()
+        sep1.set_margin_top(12)
+        sep1.set_margin_bottom(12)
+        main_box.append(sep1)
+
+        # --- Fabric Loader Version ---
         loader_label = Gtk.Label(label="Fabric Loader Version")
         loader_label.set_halign(Gtk.Align.START)
         loader_label.add_css_class("heading")
-        loader_label.set_margin_top(12)
         main_box.append(loader_label)
-        
-        self.loader_combo = Adw.ComboRow()
-        self.loader_combo.set_title("Select Fabric Loader")
-        self.loader_combo.set_subtitle("Click to load versions first")
-        self.loader_combo.set_sensitive(False)
-        main_box.append(self.loader_combo)
-        
-        # Load versions button
-        self.load_versions_btn = Gtk.Button(label="Load Available Versions")
-        self.load_versions_btn.add_css_class("suggested-action")
-        self.load_versions_btn.connect("clicked", self.on_load_versions_clicked)
-        main_box.append(self.load_versions_btn)
-        
-        # Separator
-        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        separator.set_margin_top(12)
-        separator.set_margin_bottom(12)
-        main_box.append(separator)
-        
-        # Download button
+
+        self.loader_entry = Gtk.Entry()
+        self.loader_entry.set_placeholder_text("Select Minecraft version first")
+        self.loader_entry.set_sensitive(False)
+        main_box.append(self.loader_entry)
+
+        self.loader_spinner = Gtk.Spinner()
+        self.loader_spinner.set_visible(False)
+        main_box.append(self.loader_spinner)
+
+        # --- Separator ---
+        sep2 = Gtk.Separator()
+        sep2.set_margin_top(12)
+        sep2.set_margin_bottom(12)
+        main_box.append(sep2)
+
+        # --- Fabric Installer Version ---
+        installer_label = Gtk.Label(label="Fabric Installer Version")
+        installer_label.set_halign(Gtk.Align.START)
+        installer_label.add_css_class("heading")
+        main_box.append(installer_label)
+
+        self.installer_entry = Gtk.Entry()
+        self.installer_entry.set_placeholder_text("Select Fabric loader first")
+        self.installer_entry.set_sensitive(False)
+        main_box.append(self.installer_entry)
+
+        self.installer_spinner = Gtk.Spinner()
+        self.installer_spinner.set_visible(False)
+        main_box.append(self.installer_spinner)
+
+        # --- Separator ---
+        sep3 = Gtk.Separator()
+        sep3.set_margin_top(12)
+        sep3.set_margin_bottom(12)
+        main_box.append(sep3)
+
+        # --- Download Button ---
         self.download_button = Gtk.Button(label="Download Fabric Server")
         self.download_button.add_css_class("suggested-action")
-        self.download_button.connect("clicked", self.on_download_clicked)
         self.download_button.set_sensitive(False)
+        self.download_button.connect("clicked", self.on_download_clicked)
         main_box.append(self.download_button)
-        
-        # Progress bar
+
+        # --- Progress & Status ---
         self.progress_bar = Gtk.ProgressBar()
-        self.progress_bar.set_hexpand(True)
         self.progress_bar.set_visible(False)
         main_box.append(self.progress_bar)
-        
-        # Status label
+
         self.status_label = Gtk.Label(label="")
+        self.status_label.set_visible(False)
         self.status_label.set_halign(Gtk.Align.CENTER)
         self.status_label.add_css_class("dim-label")
-        self.status_label.set_visible(False)
         main_box.append(self.status_label)
-        
+
+        # Finalize UI
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_child(main_box)
         self.content.set_content(scrolled)
-        
         self.set_content(self.content)
-        
-        self.loader_versions = []
-        self.selected_loader = None
-    
-    def get_servers_dir(self):
-        """Get the servers directory from settings (cross-platform)"""
-        config_dir = appdirs.user_config_dir("grassy")
-        settings_file = os.path.join(config_dir, "settings.txt")
-        data_dir = appdirs.user_data_dir("grassy")
-        default_dir = os.path.join(data_dir, "servers")
-        
-        if os.path.exists(settings_file):
-            try:
-                with open(settings_file, 'r') as f:
-                    saved_dir = f.read().strip()
-                    if saved_dir and os.path.exists(saved_dir):
-                        return saved_dir
-            except:
-                pass
-        
-        # Create default directory if it doesn't exist
-        os.makedirs(default_dir, exist_ok=True)
-        return default_dir
-    
-    def on_load_versions_clicked(self, button):
-        """Load Fabric versions for the specified Minecraft version"""
-        mc_version = self.mc_version_entry.get_text().strip()
-        
-        if not mc_version:
-            self.show_error("Please enter a Minecraft version")
-            return
-        
-        self.load_versions_btn.set_sensitive(False)
-        self.load_versions_btn.set_label("Loading...")
-        self.status_label.set_visible(True)
-        self.status_label.set_label(f"Loading Fabric versions for {mc_version}...")
-        
-        thread = threading.Thread(target=self.load_fabric_versions, args=(mc_version,))
-        thread.daemon = True
-        thread.start()
-    
-    def load_fabric_versions(self, mc_version):
-        """Load Fabric loader versions"""
+
+        # Start loading data
+        self.load_minecraft_versions()
+        self.load_installer_versions()  # Pre-load installer versions from Maven
+
+    # ----------------------------------------------------------------------
+    # 1. LOAD MINECRAFT VERSIONS (from Mojang API)
+    # ----------------------------------------------------------------------
+    def load_minecraft_versions(self):
+        self.mc_spinner.set_visible(True)
+        self.mc_spinner.start()
+        self.mc_entry.set_placeholder_text("Loading Minecraft versions...")
+        threading.Thread(target=self._fetch_mc_versions, daemon=True).start()
+
+    def _fetch_mc_versions(self):
         try:
-            # Fabric API endpoint
-            url = "https://meta.fabricmc.net/v2/versions/loader"
+            url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+            # Get only release versions
+            versions = [v["id"] for v in data["versions"] if v["type"] == "release"]
+            versions.sort(reverse=True)
+            self.all_mc_versions = versions
+            GLib.idle_add(self._update_mc_list, versions)
+        except Exception as e:
+            GLib.idle_add(self.show_error, f"Failed to load Minecraft versions: {str(e)}")
+
+    def _update_mc_list(self, versions):
+        self.mc_spinner.stop()
+        self.mc_spinner.set_visible(False)
+
+        if not versions:
+            self.mc_entry.set_placeholder_text("No versions found")
+            return
+
+        # Set up autocomplete
+        model = Gtk.ListStore(str)
+        for v in versions:
+            model.append([v])
+
+        completion = Gtk.EntryCompletion()
+        completion.set_model(model)
+        completion.set_text_column(0)
+        completion.set_inline_completion(True)
+        completion.set_popup_completion(True)
+
+        self.mc_entry.set_completion(completion)
+        self.mc_entry.set_text(versions[0])
+        self.mc_entry.set_sensitive(True)
+
+        # Trigger loader loading
+        self.on_mc_changed()
+        self.mc_entry.connect("changed", self.on_mc_changed)
+
+    def on_mc_changed(self, *args):
+        text = self.mc_entry.get_text().strip()
+        if text in self.all_mc_versions:
+            self.selected_mc = text
+            # Load Fabric loaders for this specific Minecraft version
+            self._load_fabric_loaders(text)
+        else:
+            self.selected_mc = None
+            self.download_button.set_sensitive(False)
+
+    # ----------------------------------------------------------------------
+    # 2. LOAD FABRIC LOADER VERSIONS 
+    #    CORRECT ENDPOINT: /v2/versions/loader/{mc_version}
+    #    Returns an ARRAY of all loaders for that MC version
+    # ----------------------------------------------------------------------
+    def _load_fabric_loaders(self, mc_version):
+        self.loader_entry.set_sensitive(False)
+        self.loader_entry.set_placeholder_text("Loading Fabric loaders...")
+        self.loader_spinner.set_visible(True)
+        self.loader_spinner.start()
+        self.download_button.set_sensitive(False)
+        threading.Thread(target=self._fetch_fabric_loaders, args=(mc_version,), daemon=True).start()
+
+    def _fetch_fabric_loaders(self, mc_version):
+        try:
+            # CORRECT: Only Minecraft version in the URL - returns an array
+            url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}"
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             
-            all_loaders = response.json()
+            data = response.json()
             
-            # Filter loaders compatible with the Minecraft version
-            compatible_loaders = []
-            for loader in all_loaders:
-                # Check if this loader supports the Minecraft version
-                versions_url = f"https://meta.fabricmc.net/v2/versions/loader/{loader['version']}/game/{mc_version}"
-                try:
-                    check_response = requests.get(versions_url, timeout=10)
-                    if check_response.status_code == 200:
-                        compatible_loaders.append(loader['version'])
-                except:
-                    continue
+            # Extract loader versions from the array response
+            loaders = []
+            if isinstance(data, list):
+                for item in data:
+                    if 'loader' in item and 'version' in item['loader']:
+                        loaders.append(item['loader']['version'])
             
-            if not compatible_loaders:
-                # Fallback: show latest loaders
-                compatible_loaders = [l['version'] for l in all_loaders[:10]]
+            # Remove duplicates and sort (newest first)
+            loaders = sorted(list(set(loaders)), reverse=True)
             
-            self.loader_versions = compatible_loaders
+            self.loader_versions = loaders
+            GLib.idle_add(self._update_loader_list, loaders)
             
-            GLib.idle_add(self.update_loader_versions, compatible_loaders)
-            
-        except requests.RequestException as e:
-            GLib.idle_add(self.show_error, f"Failed to load versions: {str(e)}")
-    
-    def update_loader_versions(self, versions):
-        """Update the combo box with available loader versions"""
-        model = Gtk.StringList()
-        for version in versions:
-            model.append(version)
-        
-        self.loader_combo.set_model(model)
-        self.loader_combo.set_sensitive(True)
-        self.loader_combo.connect("notify::selected", self.on_loader_selected)
-        
-        self.load_versions_btn.set_sensitive(True)
-        self.load_versions_btn.set_label("Load Available Versions")
-        self.status_label.set_visible(False)
-        self.download_button.set_sensitive(True)
-    
-    def on_loader_selected(self, combo, _pspec):
-        """Handle loader version selection"""
-        selected = combo.get_selected()
-        if selected >= 0:
-            self.selected_loader = self.loader_versions[selected]
-    
-    def on_download_clicked(self, button):
-        """Start Fabric download"""
-        mc_version = self.mc_version_entry.get_text().strip()
-        
-        if not mc_version:
-            self.show_error("Please enter a Minecraft version")
+        except Exception as e:
+            GLib.idle_add(self.show_error, f"Failed to load Fabric loaders: {str(e)}")
+
+    def _update_loader_list(self, versions):
+        self.loader_spinner.stop()
+        self.loader_spinner.set_visible(False)
+
+        if not versions:
+            self.loader_entry.set_placeholder_text("No loaders found for this MC version")
+            self.loader_entry.set_sensitive(False)
             return
+
+        model = Gtk.ListStore(str)
+        for v in versions:
+            model.append([v])
+
+        completion = Gtk.EntryCompletion()
+        completion.set_model(model)
+        completion.set_text_column(0)
+        completion.set_inline_completion(True)
+        completion.set_popup_completion(True)
+
+        self.loader_entry.set_completion(completion)
+        self.loader_entry.set_text(versions[0])
+        self.loader_entry.set_sensitive(True)
+
+        self.selected_loader = versions[0]
+        self._update_download_button()
+
+        self.loader_entry.connect("changed", self.on_loader_changed)
+
+    def on_loader_changed(self, *args):
+        text = self.loader_entry.get_text().strip()
+        if text in self.loader_versions:
+            self.selected_loader = text
+        else:
+            self.selected_loader = None
+        self._update_download_button()
+
+    # ----------------------------------------------------------------------
+    # 3. LOAD FABRIC INSTALLER VERSIONS (from Maven directory listing)
+    #    Filters out .xml and other files, keeps only folders (versions)
+    # ----------------------------------------------------------------------
+    def load_installer_versions(self):
+        self.installer_spinner.set_visible(True)
+        self.installer_spinner.start()
+        self.installer_entry.set_placeholder_text("Loading installer versions...")
+        threading.Thread(target=self._fetch_installer_versions, daemon=True).start()
+    def _fetch_installer_versions(self):
+        try:
+            url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/"
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
         
-        if not self.selected_loader:
-            self.show_error("Please select a Fabric loader version")
+            content = response.text
+        
+            # Pattern for X.Y.Z format (exactly 2 dots, all digits, starting with 1+)
+            # Matches: 1.0.0, 1.0.1, 1.1.0, 1.1.1, etc.
+            # Does NOT match: 0.1.0.1, 0.10.0, 0.11.2, etc.
+            version_pattern = r'href="([1-9][0-9]*\.[0-9]+\.[0-9]+/)"'
+            matches = re.findall(version_pattern, content)
+        
+            # Remove trailing slashes
+            versions = [v.rstrip('/') for v in matches]
+        
+            # Sort by version (newest first)
+            versions.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
+        
+            self.installer_versions = versions
+            GLib.idle_add(self._update_installer_list, versions)
+        
+        except Exception as e:
+            GLib.idle_add(self.show_error, f"Failed to load installer versions: {str(e)}")
+    def _update_installer_list(self, versions):
+        self.installer_spinner.stop()
+        self.installer_spinner.set_visible(False)
+
+        if not versions:
+            self.installer_entry.set_placeholder_text("No installer versions found")
+            self.installer_entry.set_sensitive(False)
             return
-        
-        # Disable download button
+
+        model = Gtk.ListStore(str)
+        for v in versions:
+            model.append([v])
+
+        completion = Gtk.EntryCompletion()
+        completion.set_model(model)
+        completion.set_text_column(0)
+        completion.set_inline_completion(True)
+        completion.set_popup_completion(True)
+
+        self.installer_entry.set_completion(completion)
+        self.installer_entry.set_text(versions[0])
+        self.installer_entry.set_sensitive(True)
+
+        self.selected_installer = versions[0]
+        self._update_download_button()
+        self.installer_entry.connect("changed", self.on_installer_changed)
+
+    def on_installer_changed(self, *args):
+        text = self.installer_entry.get_text().strip()
+        if text in self.installer_versions:
+            self.selected_installer = text
+        else:
+            self.selected_installer = None
+        self._update_download_button()
+
+    def _update_download_button(self):
+        if self.selected_mc and self.selected_loader and self.selected_installer:
+            self.download_button.set_sensitive(True)
+        else:
+            self.download_button.set_sensitive(False)
+
+    # ----------------------------------------------------------------------
+    # 4. DOWNLOAD PROCESS
+    # ----------------------------------------------------------------------
+    def on_download_clicked(self, btn):
+        if not (self.selected_mc and self.selected_loader and self.selected_installer):
+            self.show_error("Please select all three versions")
+            return
+
         self.download_button.set_sensitive(False)
-        self.download_button.set_label("Downloading...")
-        
-        # Show progress
+        self.mc_entry.set_sensitive(False)
+        self.loader_entry.set_sensitive(False)
+        self.installer_entry.set_sensitive(False)
+
         self.progress_bar.set_visible(True)
-        self.progress_bar.set_fraction(0.0)
         self.status_label.set_visible(True)
         self.status_label.set_label(f"Downloading Fabric {self.selected_loader}...")
-        
-        # Start download thread
-        thread = threading.Thread(
-            target=self.download_fabric,
-            args=(mc_version, self.selected_loader)
-        )
-        thread.daemon = True
-        thread.start()
-    
-    def download_fabric(self, mc_version, loader_version):
-        """Download and install Fabric server"""
+
+        threading.Thread(
+            target=self._download_fabric_server,
+            args=(self.selected_mc, self.selected_loader, self.selected_installer),
+            daemon=True
+        ).start()
+
+    def _download_fabric_server(self, mc_version, loader_version, installer_version):
         try:
-            # Get Fabric installer
-            installer_url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}/{loader_version}/server/jar"
-            
-            self.update_status("Downloading Fabric server...")
-            
-            servers_dir = self.get_servers_dir()
-            server_folder = Path(servers_dir) / f"fabric_{mc_version}_{loader_version}"
-            server_folder.mkdir(parents=True, exist_ok=True)
-            
-            server_jar_path = server_folder / "server.jar"
-            
+            # Correct URL with all three components
+            url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}/{loader_version}/{installer_version}/server/jar"
+
+            servers_dir = self._get_servers_dir()
+            # Folder name format: fabric_server-{mc}-{loader}-{installer}
+            folder_name = f"fabric_server-{mc_version}-{loader_version}-{installer_version}"
+            folder = Path(servers_dir) / folder_name
+            folder.mkdir(parents=True, exist_ok=True)
+
+            jar_path = folder / "server.jar"
+
             # Download with progress
-            response = requests.get(installer_url, stream=True, timeout=60)
+            response = requests.get(url, stream=True, timeout=60)
             response.raise_for_status()
-            
-            total_size = int(response.headers.get('content-length', 0))
+
+            total = int(response.headers.get("content-length", 0))
             downloaded = 0
-            
-            with open(server_jar_path, 'wb') as f:
+
+            with open(jar_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
-                        if total_size > 0:
-                            progress = downloaded / total_size
-                            GLib.idle_add(self.update_progress, progress)
-            
-            # Accept EULA
-            eula_path = server_folder / "eula.txt"
+                        if total:
+                            GLib.idle_add(self._update_progress, downloaded / total)
+
+            # Auto-accept EULA
+            eula_path = folder / "eula.txt"
             with open(eula_path, 'w') as f:
                 f.write("eula=true\n")
-            
-            GLib.idle_add(self.download_complete, f"Fabric {loader_version}", server_folder)
-            
+
+            GLib.idle_add(self._download_complete, f"Fabric {loader_version}", folder_name)
+
         except Exception as e:
-            GLib.idle_add(self.show_error, f"Failed to install Fabric: {str(e)}")
-    
-    def update_status(self, message):
-        """Update status label"""
-        GLib.idle_add(lambda: self.status_label.set_label(message))
-    
-    def update_progress(self, fraction):
-        """Update progress bar"""
+            GLib.idle_add(self.show_error, f"Download failed: {str(e)}")
+
+    def _update_progress(self, fraction):
         self.progress_bar.set_fraction(fraction)
-    
-    def download_complete(self, version, server_folder):
-        """Handle successful download"""
+
+    def _download_complete(self, version, folder_name):
         self.status_label.set_label(f"✓ Successfully installed {version}!")
         self.progress_bar.set_fraction(1.0)
-        
-        GLib.timeout_add(1500, self.close_and_refresh)
-    
-    def close_and_refresh(self):
-        """Close dialog and refresh server list"""
-        if self.parent and hasattr(self.parent, 'refresh_server_list'):
+        GLib.timeout_add(1500, self._close_and_refresh)
+
+    def _close_and_refresh(self):
+        if self.parent and hasattr(self.parent, "refresh_server_list"):
             self.parent.refresh_server_list()
         self.destroy()
         return False
-    
-    def show_error(self, error_message):
-        """Show error message"""
-        self.status_label.set_label(f"Error: {error_message}")
+
+    # ----------------------------------------------------------------------
+    # UTILITIES
+    # ----------------------------------------------------------------------
+    def _get_servers_dir(self):
+        base = appdirs.user_data_dir("grassy")
+        path = Path(base) / "servers"
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
+
+    def show_error(self, msg):
+        self.status_label.set_visible(True)
+        self.status_label.set_label(f"Error: {msg}")
         self.status_label.add_css_class("error")
         self.download_button.set_sensitive(True)
-        self.download_button.set_label("Download Fabric Server")
+        self.mc_entry.set_sensitive(True)
+        self.loader_entry.set_sensitive(True)
+        self.installer_entry.set_sensitive(True)
         self.progress_bar.set_visible(False)
-        self.load_versions_btn.set_sensitive(True)
+        # Stop any visible spinners
+        for spinner in [self.mc_spinner, self.loader_spinner, self.installer_spinner]:
+            spinner.stop()
+            spinner.set_visible(False)
