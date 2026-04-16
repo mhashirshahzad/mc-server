@@ -1,5 +1,5 @@
 from gi.repository import Adw, Gio
-from window import GrassyWindow
+from ui.window import GrassyWindow
 
 class GrassyApp(Adw.Application):
     def __init__(self):

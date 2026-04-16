@@ -4,8 +4,9 @@ import threading
 from pathlib import Path
 import appdirs
 
+from utils import get_servers_dir
 
-class DownloadsWindow(Adw.Window):
+class MinecraftDownloaderWindow(Adw.Window):
     def __init__(self, parent, **kwargs):
         super().__init__(**kwargs)
 
@@ -164,7 +165,7 @@ class DownloadsWindow(Adw.Window):
         version = self.get_selected_version()
 
         if not version:
-            self.show_error("Invalid version selected")
+            self.show_error(f"Invalid version selected. Available versions: {self.all_versions[0]} - {self.all_versions[-1]}")
             return
 
         self.download_button.set_sensitive(False)
@@ -196,14 +197,14 @@ class DownloadsWindow(Adw.Window):
                     break
 
             if not version_url:
-                GLib.idle_add(self.show_error, "Version not found")
+                GLib.idle_add(self.show_error, f"Version {version} not found in manifest")
                 return
 
             vr = requests.get(version_url).json()
             server_url = vr["downloads"]["server"]["url"]
 
-            servers_dir = self.get_servers_dir()
-            folder = Path(servers_dir) / f"server_{version}"
+            servers_dir = get_servers_dir()
+            folder = Path(servers_dir) / version  # Changed from server_{version} to just {version}
             folder.mkdir(parents=True, exist_ok=True)
 
             jar_path = folder / "server.jar"
@@ -245,12 +246,6 @@ class DownloadsWindow(Adw.Window):
     # -----------------------
     # UTIL
     # -----------------------
-    def get_servers_dir(self):
-        base = appdirs.user_data_dir("grassy")
-        path = Path(base) / "servers"
-        path.mkdir(parents=True, exist_ok=True)
-        return str(path)
-
     def show_error(self, msg):
         self.status_label.set_visible(True)
         self.status_label.set_label(f"Error: {msg}")

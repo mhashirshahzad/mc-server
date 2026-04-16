@@ -5,6 +5,7 @@ from pathlib import Path
 import appdirs
 import re
 
+from utils import get_servers_dir, save_servers_dir
 
 class FabricDownloaderWindow(Adw.Window):
     def __init__(self, parent, **kwargs):
@@ -18,7 +19,7 @@ class FabricDownloaderWindow(Adw.Window):
 
         # Data stores
         self.all_mc_versions = []
-        self.loader_versions = []      # Loaders for selected MC version
+        self.loader_versions = []
         self.installer_versions = []
         
         self.selected_mc = None
@@ -134,32 +135,31 @@ class FabricDownloaderWindow(Adw.Window):
 
         # Start loading data
         self.load_minecraft_versions()
-        self.load_installer_versions()  # Pre-load installer versions from Maven
+        self.load_installer_versions()
 
     # ----------------------------------------------------------------------
-    # 1. LOAD MINECRAFT VERSIONS (from Mojang API)
+    # 1. LOAD MINECRAFT VERSIONS
     # ----------------------------------------------------------------------
     def load_minecraft_versions(self):
         self.mc_spinner.set_visible(True)
         self.mc_spinner.start()
         self.mc_entry.set_placeholder_text("Loading Minecraft versions...")
-        threading.Thread(target=self._fetch_mc_versions, daemon=True).start()
+        threading.Thread(target=self.fetch_mc_versions, daemon=True).start()
 
-    def _fetch_mc_versions(self):
+    def fetch_mc_versions(self):
         try:
             url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
             r = requests.get(url, timeout=30)
             r.raise_for_status()
             data = r.json()
-            # Get only release versions
             versions = [v["id"] for v in data["versions"] if v["type"] == "release"]
             versions.sort(reverse=True)
             self.all_mc_versions = versions
-            GLib.idle_add(self._update_mc_list, versions)
+            GLib.idle_add(self.update_mc_list, versions)
         except Exception as e:
             GLib.idle_add(self.show_error, f"Failed to load Minecraft versions: {str(e)}")
 
-    def _update_mc_list(self, versions):
+    def update_mc_list(self, versions):
         self.mc_spinner.stop()
         self.mc_spinner.set_visible(False)
 
@@ -167,7 +167,6 @@ class FabricDownloaderWindow(Adw.Window):
             self.mc_entry.set_placeholder_text("No versions found")
             return
 
-        # Set up autocomplete
         model = Gtk.ListStore(str)
         for v in versions:
             model.append([v])
@@ -182,7 +181,6 @@ class FabricDownloaderWindow(Adw.Window):
         self.mc_entry.set_text(versions[0])
         self.mc_entry.set_sensitive(True)
 
-        # Trigger loader loading
         self.on_mc_changed()
         self.mc_entry.connect("changed", self.on_mc_changed)
 
@@ -190,51 +188,48 @@ class FabricDownloaderWindow(Adw.Window):
         text = self.mc_entry.get_text().strip()
         if text in self.all_mc_versions:
             self.selected_mc = text
-            # Load Fabric loaders for this specific Minecraft version
-            self._load_fabric_loaders(text)
+            self.load_fabric_loaders(text)
         else:
             self.selected_mc = None
             self.download_button.set_sensitive(False)
 
     # ----------------------------------------------------------------------
-    # 2. LOAD FABRIC LOADER VERSIONS 
-    #    CORRECT ENDPOINT: /v2/versions/loader/{mc_version}
-    #    Returns an ARRAY of all loaders for that MC version
+    # 2. LOAD FABRIC LOADER VERSIONS
     # ----------------------------------------------------------------------
-    def _load_fabric_loaders(self, mc_version):
+    def load_fabric_loaders(self, mc_version):
         self.loader_entry.set_sensitive(False)
         self.loader_entry.set_placeholder_text("Loading Fabric loaders...")
         self.loader_spinner.set_visible(True)
         self.loader_spinner.start()
         self.download_button.set_sensitive(False)
-        threading.Thread(target=self._fetch_fabric_loaders, args=(mc_version,), daemon=True).start()
+        threading.Thread(target=self.fetch_fabric_loaders, args=(mc_version,), daemon=True).start()
 
-    def _fetch_fabric_loaders(self, mc_version):
+    def fetch_fabric_loaders(self, mc_version):
         try:
-            # CORRECT: Only Minecraft version in the URL - returns an array
             url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}"
             response = requests.get(url, timeout=30)
             response.raise_for_status()
-            
+        
             data = response.json()
-            
-            # Extract loader versions from the array response
+        
             loaders = []
             if isinstance(data, list):
                 for item in data:
                     if 'loader' in item and 'version' in item['loader']:
-                        loaders.append(item['loader']['version'])
-            
-            # Remove duplicates and sort (newest first)
+                        version = item['loader']['version']
+                        parts = version.split('.')
+                        if len(parts) == 3:
+                            if all(part.isdigit() for part in parts):
+                                loaders.append(version)
+        
             loaders = sorted(list(set(loaders)), reverse=True)
-            
             self.loader_versions = loaders
-            GLib.idle_add(self._update_loader_list, loaders)
-            
+            GLib.idle_add(self.update_loader_list, loaders)
+        
         except Exception as e:
             GLib.idle_add(self.show_error, f"Failed to load Fabric loaders: {str(e)}")
 
-    def _update_loader_list(self, versions):
+    def update_loader_list(self, versions):
         self.loader_spinner.stop()
         self.loader_spinner.set_visible(False)
 
@@ -258,7 +253,7 @@ class FabricDownloaderWindow(Adw.Window):
         self.loader_entry.set_sensitive(True)
 
         self.selected_loader = versions[0]
-        self._update_download_button()
+        self.update_download_button()
 
         self.loader_entry.connect("changed", self.on_loader_changed)
 
@@ -268,18 +263,18 @@ class FabricDownloaderWindow(Adw.Window):
             self.selected_loader = text
         else:
             self.selected_loader = None
-        self._update_download_button()
+        self.update_download_button()
 
     # ----------------------------------------------------------------------
-    # 3. LOAD FABRIC INSTALLER VERSIONS (from Maven directory listing)
-    #    Filters out .xml and other files, keeps only folders (versions)
+    # 3. LOAD FABRIC INSTALLER VERSIONS
     # ----------------------------------------------------------------------
     def load_installer_versions(self):
         self.installer_spinner.set_visible(True)
         self.installer_spinner.start()
         self.installer_entry.set_placeholder_text("Loading installer versions...")
-        threading.Thread(target=self._fetch_installer_versions, daemon=True).start()
-    def _fetch_installer_versions(self):
+        threading.Thread(target=self.fetch_installer_versions, daemon=True).start()
+
+    def fetch_installer_versions(self):
         try:
             url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/"
             response = requests.get(url, timeout=30)
@@ -287,24 +282,20 @@ class FabricDownloaderWindow(Adw.Window):
         
             content = response.text
         
-            # Pattern for X.Y.Z format (exactly 2 dots, all digits, starting with 1+)
-            # Matches: 1.0.0, 1.0.1, 1.1.0, 1.1.1, etc.
-            # Does NOT match: 0.1.0.1, 0.10.0, 0.11.2, etc.
             version_pattern = r'href="([1-9][0-9]*\.[0-9]+\.[0-9]+/)"'
             matches = re.findall(version_pattern, content)
         
-            # Remove trailing slashes
             versions = [v.rstrip('/') for v in matches]
         
-            # Sort by version (newest first)
             versions.sort(key=lambda v: [int(x) for x in v.split('.')], reverse=True)
         
             self.installer_versions = versions
-            GLib.idle_add(self._update_installer_list, versions)
+            GLib.idle_add(self.update_installer_list, versions)
         
         except Exception as e:
             GLib.idle_add(self.show_error, f"Failed to load installer versions: {str(e)}")
-    def _update_installer_list(self, versions):
+
+    def update_installer_list(self, versions):
         self.installer_spinner.stop()
         self.installer_spinner.set_visible(False)
 
@@ -328,7 +319,7 @@ class FabricDownloaderWindow(Adw.Window):
         self.installer_entry.set_sensitive(True)
 
         self.selected_installer = versions[0]
-        self._update_download_button()
+        self.update_download_button()
         self.installer_entry.connect("changed", self.on_installer_changed)
 
     def on_installer_changed(self, *args):
@@ -337,9 +328,9 @@ class FabricDownloaderWindow(Adw.Window):
             self.selected_installer = text
         else:
             self.selected_installer = None
-        self._update_download_button()
+        self.update_download_button()
 
-    def _update_download_button(self):
+    def update_download_button(self):
         if self.selected_mc and self.selected_loader and self.selected_installer:
             self.download_button.set_sensitive(True)
         else:
@@ -363,25 +354,23 @@ class FabricDownloaderWindow(Adw.Window):
         self.status_label.set_label(f"Downloading Fabric {self.selected_loader}...")
 
         threading.Thread(
-            target=self._download_fabric_server,
+            target=self.download_fabric_server,
             args=(self.selected_mc, self.selected_loader, self.selected_installer),
             daemon=True
         ).start()
 
-    def _download_fabric_server(self, mc_version, loader_version, installer_version):
+    def download_fabric_server(self, mc_version, loader_version, installer_version):
         try:
-            # Correct URL with all three components
             url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}/{loader_version}/{installer_version}/server/jar"
 
-            servers_dir = self._get_servers_dir()
-            # Folder name format: fabric_server-{mc}-{loader}-{installer}
-            folder_name = f"fabric_server-{mc_version}-{loader_version}-{installer_version}"
+            servers_dir = get_servers_dir()
+            
+            folder_name = f"fabric_{mc_version}"
             folder = Path(servers_dir) / folder_name
             folder.mkdir(parents=True, exist_ok=True)
 
             jar_path = folder / "server.jar"
 
-            # Download with progress
             response = requests.get(url, stream=True, timeout=60)
             response.raise_for_status()
 
@@ -394,27 +383,26 @@ class FabricDownloaderWindow(Adw.Window):
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total:
-                            GLib.idle_add(self._update_progress, downloaded / total)
+                            GLib.idle_add(self.update_progress, downloaded / total)
 
-            # Auto-accept EULA
             eula_path = folder / "eula.txt"
             with open(eula_path, 'w') as f:
                 f.write("eula=true\n")
 
-            GLib.idle_add(self._download_complete, f"Fabric {loader_version}", folder_name)
+            GLib.idle_add(self.download_complete, f"Fabric {loader_version}", folder_name)
 
         except Exception as e:
             GLib.idle_add(self.show_error, f"Download failed: {str(e)}")
 
-    def _update_progress(self, fraction):
+    def update_progress(self, fraction):
         self.progress_bar.set_fraction(fraction)
 
-    def _download_complete(self, version, folder_name):
+    def download_complete(self, version, folder_name):
         self.status_label.set_label(f"✓ Successfully installed {version}!")
         self.progress_bar.set_fraction(1.0)
-        GLib.timeout_add(1500, self._close_and_refresh)
+        GLib.timeout_add(1500, self.close_and_refresh)
 
-    def _close_and_refresh(self):
+    def close_and_refresh(self):
         if self.parent and hasattr(self.parent, "refresh_server_list"):
             self.parent.refresh_server_list()
         self.destroy()
@@ -423,12 +411,6 @@ class FabricDownloaderWindow(Adw.Window):
     # ----------------------------------------------------------------------
     # UTILITIES
     # ----------------------------------------------------------------------
-    def _get_servers_dir(self):
-        base = appdirs.user_data_dir("grassy")
-        path = Path(base) / "servers"
-        path.mkdir(parents=True, exist_ok=True)
-        return str(path)
-
     def show_error(self, msg):
         self.status_label.set_visible(True)
         self.status_label.set_label(f"Error: {msg}")
@@ -438,7 +420,7 @@ class FabricDownloaderWindow(Adw.Window):
         self.loader_entry.set_sensitive(True)
         self.installer_entry.set_sensitive(True)
         self.progress_bar.set_visible(False)
-        # Stop any visible spinners
+        
         for spinner in [self.mc_spinner, self.loader_spinner, self.installer_spinner]:
             spinner.stop()
             spinner.set_visible(False)

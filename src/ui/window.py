@@ -3,12 +3,15 @@ from pathlib import Path
 import os
 import appdirs
 
+#
 from ui.settings import SettingsWindow
 from ui.card import ServerCard
-from ui.server_downloader import DownloadsWindow
-from ui.forge_downloader import ForgeDownloaderWindow
-from ui.fabric_downloader import FabricDownloaderWindow
 
+from ui.downloader.minecraft import MinecraftDownloaderWindow
+from ui.downloader.forge import ForgeDownloaderWindow
+from ui.downloader.fabric import FabricDownloaderWindow
+from ui.server_runner import ServerRunnerWindow
+from utils import get_servers_dir, save_servers_dir
 
 class GrassyWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
@@ -109,7 +112,7 @@ class GrassyWindow(Adw.ApplicationWindow):
     
     def on_download_official(self, action, param):
         """Open official Minecraft downloader"""
-        window = DownloadsWindow(parent=self)
+        window = MinecraftDownloaderWindow(parent=self)
         window.connect("destroy", lambda d: self.refresh_server_list())
         window.present()
     
@@ -128,25 +131,7 @@ class GrassyWindow(Adw.ApplicationWindow):
     # -------------------------
     # DATA
     # -------------------------
-
-    def get_servers_dir(self):
-        config_dir = appdirs.user_config_dir("grassy")
-        settings_file = os.path.join(config_dir, "settings.txt")
-        data_dir = appdirs.user_data_dir("grassy")
-        default_dir = os.path.join(data_dir, "servers")
-
-        if os.path.exists(settings_file):
-            try:
-                with open(settings_file, "r") as f:
-                    saved = f.read().strip()
-                    if saved:
-                        return saved
-            except:
-                pass
-
-        return default_dir
-
-    # -------------------------
+   # -------------------------
     # SERVER LOADING
     # -------------------------
 
@@ -158,7 +143,8 @@ class GrassyWindow(Adw.ApplicationWindow):
 
         self.server_cards = []
 
-        servers_dir = self.get_servers_dir()
+        servers_dir = get_servers_dir()
+        
 
         if not os.path.exists(servers_dir):
             os.makedirs(servers_dir, exist_ok=True)
@@ -243,3 +229,4 @@ class GrassyWindow(Adw.ApplicationWindow):
 
     def on_scan_clicked(self, button):
         self.refresh_server_list()
+
