@@ -20,34 +20,31 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            python3 python3-pip python3-venv \
-            libgtk-4-1 libadwaita-1-0 \
-            gir1.2-gtk-4.0 gir1.2-adw-1 \
-            pkg-config \
-            meson \
-            ninja-build \
-            libcairo2-dev \
-            libgirepository1.0-dev \
-            build-essential
+            python3 \
+            python3-pip \
+            python3-gi \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1 \
+            make
 
-      - name: Create venv
+      - name: Install Python packages
         run: |
-          python3 -m venv venv
-          ./venv/bin/pip install --upgrade pip setuptools wheel
+          pip install --user pyinstaller requests appdirs
 
-      - name: Install Python deps
+      - name: Get version from Makefile
+        id: version
         run: |
-          ./venv/bin/pip install \
-            pyinstaller \
-            pygobject \
-            requests \
-            appdirs
+          VERSION=$(make version)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
       - name: Build binary
         run: |
-          ./venv/bin/pyinstaller \
-            --onefile \
+          pyinstaller --onefile \
             --name grassy \
+            --hidden-import=gi \
+            --hidden-import=gi.repository \
+            --add-data "src:src" \
             src/main.py
 
       - name: Upload artifact
@@ -56,36 +53,10 @@ jobs:
           name: grassy-linux
           path: dist/grassy
 
-  build-windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install deps
-        run: |
-          pip install pyinstaller pygobject requests appdirs
-
-      - name: Build binary
-        run: |
-          pyinstaller --onefile --name grassy src/main.py
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: grassy-windows
-          path: dist/grassy.exe
-
-
   release:
-    needs: [build-linux, build-windows]
+    needs: [build-linux]
     runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
@@ -95,7 +66,8 @@ jobs:
         id: version
         run: |
           VERSION=$(make version)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
@@ -103,25 +75,28 @@ jobs:
           name: grassy-linux
           path: release/
 
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: grassy-windows
-          path: release/
-
-      - name: Rename binaries
+      - name: Make binary executable
         run: |
-          mv release/grassy release/grassy-linux || true
-          mv release/grassy.exe release/grassy-windows.exe || true
+          chmod +x release/grassy
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ env.VERSION }}
-          name: Grassy v${{ env.VERSION }}
-          draft: false
-          prerelease: false
-          make_latest: true
-          files: |
-            release/grassy-linux
-            release/grassy-windows.exe
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Grassy v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Grassy v${{ steps.version.outputs.VERSION }}
+            
+            ### Installation:
+            ```bash
+            # Download the binary
+            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/grassy
+            
+            # Make it executable
+            chmod +x grassy
+            
+            # Optional: move to PATH
+            sudo mv grassy /usr/local/bin/
+            
+            # Run
+            grassy

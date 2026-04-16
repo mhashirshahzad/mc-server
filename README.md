@@ -1,11 +1,12 @@
 # Grassy
  A beautiful and easy-to-use Minecraft server manager built with Python and GTK4/libadwaita.
 
-
 ### Downloading
 
-Download the latest version:
--> https://github.com/mhashirshahzad/grassy/releases/latest
+Download the [latest version](https://github.com/mhashirshahzad/grassy/releases/latest)
+
+<details>
+<summary><b>📸 Screenshots (Click to expand)</b></summary>
 
 ### Main window
 ![Main Window](assets/main_window.png)
@@ -15,6 +16,8 @@ Download the latest version:
 
 ### Server Settings
 ![Server Settings](assets/server_settings.png)
+
+</details>
 
 ### Dependencies
 Arch:
