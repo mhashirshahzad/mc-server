@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-echo "📦 installing minimal arch build deps..."
+echo "📦 installing minimal arch build deps for AppImage..."
 
 pacman -Sy --noconfirm \
     python \
@@ -18,6 +18,10 @@ pacman -Sy --noconfirm \
     wget \
     file \
     binutils \
-    fuse3
+    fuse3 \
+    # Additional deps for AppImage
+    libfuse2 \
+    desktop-file-utils \
+    libappimage
 
 echo "✅ done"
