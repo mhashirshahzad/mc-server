@@ -1,0 +1,54 @@
+name: Build Windows
+
+on:
+  push:
+    paths:
+      - "version.txt"
+      
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Python (needed for venv + PyInstaller)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Install MSYS2 (this gives you C:\msys64)
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-gdk-pixbuf2
+            mingw-w64-ucrt-x86_64-pango
+            mingw-w64-ucrt-x86_64-cairo
+            mingw-w64-ucrt-x86_64-harfbuzz
+            mingw-w64-ucrt-x86_64-fontconfig
+            mingw-w64-ucrt-x86_64-freetype
+            mingw-w64-ucrt-x86_64-graphene
+            mingw-w64-ucrt-x86_64-epoxy
+            mingw-w64-ucrt-x86_64-libxml2
+            mingw-w64-ucrt-x86_64-sqlite3
+
+      # Run your build script
+      - name: Build with batch script
+        shell: cmd
+        run: build.bat
+
+      # Upload ZIP artifact
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grassy-windows
+          path: release/*.zip

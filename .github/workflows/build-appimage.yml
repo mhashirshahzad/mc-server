@@ -1,0 +1,101 @@
+name: Build AppImage
+
+on:
+  push:
+    paths:
+      - "version.txt"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -------------------------
+      # System dependencies (GTK + build tools)
+      # -------------------------
+      - name: Install system packages
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            python3 python3-pip python3-venv \
+            libgtk-4-dev libadwaita-1-dev \
+            gir1.2-gtk-4.0 gir1.2-adw-1 \
+            gobject-introspection \
+            libgirepository1.0-dev \
+            fuse \
+            file \
+            desktop-file-utils \
+            appstream
+
+      # -------------------------
+      # Python env
+      # -------------------------
+      - name: Setup venv
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # -------------------------
+      # Build binary
+      # -------------------------
+      - name: Build with PyInstaller
+        run: |
+          source venv/bin/activate
+          pyinstaller \
+            --name grassy \
+            --onedir \
+            --windowed \
+            src/main.py
+
+      # -------------------------
+      # Download AppImage tools
+      # -------------------------
+      - name: Download linuxdeploy
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+
+      - name: Download gtk plugin
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk.sh
+          chmod +x linuxdeploy-plugin-gtk.sh
+
+      # -------------------------
+      # Build AppImage
+      # -------------------------
+      - name: Create AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp -r dist/grassy/* AppDir/usr/bin/
+
+          cat > AppDir/grassy.desktop << EOF
+          [Desktop Entry]
+          Name=Grassy
+          Exec=grassy
+          Icon=grassy
+          Type=Application
+          Categories=Utility;
+          EOF
+
+      - name: Package AppImage
+        run: |
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --output appimage \
+            --plugin gtk
+
+      # -------------------------
+      # Upload artifact
+      # -------------------------
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: grassy-appimage
+          path: "*.AppImage"
