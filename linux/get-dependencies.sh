@@ -1,32 +1,28 @@
-#!/bin/sh
-set -eu
+#!/bin/bash
+set -euo pipefail
 
-# get-dependencies.sh - For Arch Linux container
+echo "📦 Installing Ubuntu build dependencies..."
 
-# Initialize pacman keyring (needed in fresh containers)
-pacman-key --init
-pacman-key --populate archlinux
+export DEBIAN_FRONTEND=noninteractive
 
-# Update and install
-pacman -Sy --noconfirm \
-    python \
-    python-gobject \
-    python-requests \
-    python-appdirs \
-    gtk4 \
-    gtk3 \
-    libadwaita \
+apt update
+
+apt install -y \
+    python3 \
+    python3-venv \
+    python3-pip \
+    python3-gi \
+    gir1.2-gtk-4.0 \
+    libadwaita-1-0 \
+    libglib2.0-0 \
+    libcairo2 \
     gobject-introspection \
-    glib2 \
+    pkg-config \
+    build-essential \
     git \
-    base-devel \
     wget \
     file \
-    binutils
-
-# For AppImage tools
-pacman -S --noconfirm \
-    fuse2 \
+    binutils \
     fuse3
 
-echo "All dependencies installed!"
+echo "✅ Ubuntu dependencies installed!"

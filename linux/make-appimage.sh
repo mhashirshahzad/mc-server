@@ -1,128 +1,112 @@
 #!/bin/bash
 set -euo pipefail
 
-# --- Configuration ---
-BINARY_NAME="grassy"
-RELEASE_DIR="release"
-APPDIR="$RELEASE_DIR/Grassy.AppDir"
-BUILD_DIR="$RELEASE_DIR/build"
-DIST_DIR="$RELEASE_DIR/dist"
+# --- configuration ---
+binary_name="grassy"
+release_dir="release"
+appdir="$release_dir/grassy.appdir"
+build_dir="$release_dir/build"
+dist_dir="$release_dir/dist"
 
-ARCH=$(uname -m)
-FINAL_NAME="${BINARY_NAME}-${ARCH}.AppImage"
+arch=$(uname -m)
+final_name="${binary_name}-${arch}.appimage"
 
-ICON="$(pwd)/assets/icon.png"
-DESKTOP="$(pwd)/assets/grassy.desktop"
-APPIMAGETOOL="$(pwd)/appimagetool-x86_64.AppImage"
+icon="$(pwd)/assets/icon.png"
+desktop="$(pwd)/assets/grassy.desktop"
+appimagetool="$(pwd)/appimagetool-x86_64.appimage"
 
-echo "🔨 Building Grassy AppImage (CI-safe)..."
+echo "🔨 building grassy appimage (gtk system-runtime mode)..."
 
-# --- Validate assets ---
-[ -f "$ICON" ] || { echo "❌ Missing icon"; exit 1; }
-[ -f "$DESKTOP" ] || { echo "❌ Missing desktop file"; exit 1; }
+# --- validate assets ---
+[ -f "$icon" ] || { echo "❌ missing icon"; exit 1; }
+[ -f "$desktop" ] || { echo "❌ missing desktop file"; exit 1; }
 
-# --- Fetch appimagetool if missing ---
-if [ ! -f "$APPIMAGETOOL" ]; then
-    echo "⬇️ Downloading appimagetool..."
-    wget -q -O "$APPIMAGETOOL" \
-        https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-    chmod +x "$APPIMAGETOOL"
+# --- fetch appimagetool ---
+if [ ! -f "$appimagetool" ]; then
+    echo "⬇️ downloading appimagetool..."
+    wget -q -o "$appimagetool" \
+        https://github.com/appimage/appimagekit/releases/download/continuous/appimagetool-x86_64.appimage
+    chmod +x "$appimagetool"
 fi
 
-# --- Python environment ---
-echo "📦 Setting up Python..."
-VENV_DIR="$BUILD_DIR/venv"
-python3 -m venv "$VENV_DIR" --clear
-"$VENV_DIR/bin/pip" install --upgrade pip
-"$VENV_DIR/bin/pip" install -r requirements.txt pyinstaller
+# --- python environment ---
+echo "📦 setting up python..."
+venv_dir="$build_dir/venv"
+python3 -m venv "$venv_dir" --clear
+"$venv_dir/bin/pip" install --upgrade pip
 
-# --- Force GTK4 awareness ---
-export GI_TYPELIB_PATH="/usr/lib/girepository-1.0"
+# important: do not install pygobject via pip
+"$venv_dir/bin/pip" install -r requirements.txt pyinstaller
 
-# --- Build with PyInstaller ---
-echo "⚙️ Building binary..."
-"$VENV_DIR/bin/python" -m PyInstaller \
-    --name "$BINARY_NAME" \
+# --- build with pyinstaller ---
+echo "⚙️ building binary..."
+"$venv_dir/bin/python" -m pyinstaller \
+    --name "$binary_name" \
     --onedir \
     --windowed \
-    --distpath "$DIST_DIR" \
-    --workpath "$BUILD_DIR/pyinstaller" \
-    --specpath "$BUILD_DIR" \
+    --distpath "$dist_dir" \
+    --workpath "$build_dir/pyinstaller" \
+    --specpath "$build_dir" \
     --hidden-import=gi \
-    --hidden-import=gi.repository.Gtk \
-    --hidden-import=gi.repository.Adw \
-    --hidden-import=gi.repository.GLib \
+    --hidden-import=gi.repository.gtk \
+    --hidden-import=gi.repository.adw \
+    --hidden-import=gi.repository.glib \
     --hidden-import=requests \
     --hidden-import=appdirs \
     src/main.py
 
-# --- AppDir structure ---
-echo "📁 Creating AppDir..."
-rm -rf "$APPDIR"
+# --- appdir structure ---
+echo "📁 creating appdir..."
+rm -rf "$appdir"
 
-mkdir -p "$APPDIR/usr/bin"
-mkdir -p "$APPDIR/usr/lib"
-mkdir -p "$APPDIR/usr/share/applications"
-mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+mkdir -p "$appdir/usr/bin"
+mkdir -p "$appdir/usr/share/applications"
+mkdir -p "$appdir/usr/share/icons/hicolor/256x256/apps"
 
-# Copy binary bundle
-cp -r "$DIST_DIR/$BINARY_NAME"/* "$APPDIR/usr/bin/"
+# copy pyinstaller bundle
+cp -r "$dist_dir/$binary_name"/* "$appdir/usr/bin/"
 
-# --- Minimal GTK runtime (best-effort) ---
-echo "📚 Copying runtime libs..."
-cp /usr/lib/libgtk-4.so* "$APPDIR/usr/lib/" 2>/dev/null || true
-cp /usr/lib/libadwaita-1.so* "$APPDIR/usr/lib/" 2>/dev/null || true
-cp /usr/lib/libglib-2.0.so* "$APPDIR/usr/lib/" 2>/dev/null || true
-cp /usr/lib/libgobject-2.0.so* "$APPDIR/usr/lib/" 2>/dev/null || true
+# --- desktop + icon ---
+cp "$desktop" "$appdir/grassy.desktop"
+cp "$desktop" "$appdir/usr/share/applications/"
 
-# --- Desktop + icon ---
-cp "$DESKTOP" "$APPDIR/grassy.desktop"
-cp "$DESKTOP" "$APPDIR/usr/share/applications/"
+cp "$icon" "$appdir/grassy.png"
+cp "$icon" "$appdir/.diricon"
+cp "$icon" "$appdir/usr/share/icons/hicolor/256x256/apps/grassy.png"
 
-cp "$ICON" "$APPDIR/grassy.png"
-cp "$ICON" "$APPDIR/.DirIcon"
-cp "$ICON" "$APPDIR/usr/share/icons/hicolor/256x256/apps/grassy.png"
-
-# --- AppRun ---
-echo "🚀 Creating AppRun..."
-cat > "$APPDIR/AppRun" << 'EOF'
+# --- apprun ---
+echo "🚀 creating apprun..."
+cat > "$appdir/apprun" << 'eof'
 #!/bin/bash
-HERE="$(dirname "$(readlink -f "$0")")"
+here="$(dirname "$(readlink -f "$0")")"
 
-export PATH="$HERE/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
-export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0:$GI_TYPELIB_PATH"
+export path="$here/usr/bin:$path"
 
-exec "$HERE/usr/bin/grassy" "$@"
-EOF
+exec "$here/usr/bin/grassy" "$@"
+eof
 
-chmod +x "$APPDIR/AppRun"
+chmod +x "$appdir/apprun"
 
-# --- Build AppImage (CI-safe: NO FUSE) ---
-echo "📀 Building AppImage..."
-
-"$APPIMAGETOOL" \
+# --- build appimage (no fuse required) ---
+echo "📀 building appimage..."
+"$appimagetool" \
     --appimage-extract-and-run \
-    --comp zstd \
-    --mksquashfs-opt -Xcompression-level \
-    --mksquashfs-opt 6 \
-    --mksquashfs-opt -b \
-    --mksquashfs-opt 131072 \
-    "$APPDIR" \
-    "$FINAL_NAME"
-# --- Output ---
-mkdir -p "$RELEASE_DIR"
+    "$appdir" \
+    "$final_name"
 
-if [ -f "$FINAL_NAME" ]; then
-    mv "$FINAL_NAME" "$RELEASE_DIR/"
-    echo "✅ Created: $RELEASE_DIR/$FINAL_NAME"
+# --- output ---
+mkdir -p "$release_dir"
+
+if [ -f "$final_name" ]; then
+    mv "$final_name" "$release_dir/"
+    echo "✅ created: $release_dir/$final_name"
 else
-    echo "❌ AppImage build failed"
+    echo "❌ appimage build failed"
     exit 1
 fi
 
-# --- Cleanup ---
-echo "🧹 Cleaning..."
-rm -rf "$BUILD_DIR" "$APPDIR"
+# --- cleanup ---
+echo "🧹 cleaning..."
+rm -rf "$build_dir" "$appdir"
 
-echo "🎉 Done."
+echo "🎉 done."
