@@ -11,12 +11,14 @@ APPIMAGETOOL="./appimagetool-x86_64.AppImage"
 
 echo "🔨 Minimal AppImage build..."
 
-# --- setup venv ---
 python -m venv "$BUILD_DIR/venv"
 "$BUILD_DIR/venv/bin/pip" install --upgrade pip
 "$BUILD_DIR/venv/bin/pip" install pyinstaller -r requirements.txt
 
-# --- PyInstaller build ---
+
+
+cp assets/icon.png "$APPDIR/grassy.png"
+
 "$BUILD_DIR/venv/bin/python" -m PyInstaller \
     --name "$BINARY_NAME" \
     --onedir \
@@ -26,7 +28,6 @@ python -m venv "$BUILD_DIR/venv"
     --specpath "$BUILD_DIR" \
     src/main.py
 
-# --- AppDir ---
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin"
 
