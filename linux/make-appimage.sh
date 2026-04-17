@@ -2,7 +2,6 @@
 set -eu
 
 ARCH=$(uname -m)
-# Handle git describe failure when not in git repo
 if git describe --tags --always 2>/dev/null; then
     VERSION=$(git describe --tags --always)
 else
@@ -13,20 +12,9 @@ export OUTPATH=./dist
 export ADD_HOOKS="self-updater.hook"
 export UPINFO="gh-releases-zsync|${GITHUB_REPOSITORY%/*}|${GITHUB_REPOSITORY#*/}|latest|*$ARCH.AppImage.zsync"
 
-# --- Required metadata (Using your actual files) ---
-# Convert PNG to SVG or use PNG directly (AppImage works with PNG too)
+# --- Required metadata ---
 export ICON="$(pwd)/assets/icon.png"
 export DESKTOP="$(pwd)/grassy.desktop"
-
-# Check if required files exist
-if [ ! -f "$ICON" ]; then
-    echo "ERROR: Icon not found at $ICON"
-    exit 1
-fi
-if [ ! -f "$DESKTOP" ]; then
-    echo "ERROR: Desktop file not found at $DESKTOP"
-    exit 1
-fi
 
 # --- Deployment options ---
 export DEPLOY_PYTHON=1
@@ -36,59 +24,50 @@ export DEPLOY_LOCALE=1
 export STARTUPWMCLASS=io.github.yourusername.grassy
 export GTK_CLASS_FIX=1
 
-# --- Create AppDir structure ---
+# --- Create basic AppDir first ---
 mkdir -p ./AppDir/usr/bin
-mkdir -p ./AppDir/usr/lib
-mkdir -p ./AppDir/usr/share
-mkdir -p ./AppDir/usr/share/icons/hicolor/scalable/apps
 mkdir -p ./AppDir/usr/share/applications
+mkdir -p ./AppDir/usr/share/icons/hicolor/256x256/apps
 
-# Copy your icon and desktop file into AppDir
-cp "$ICON" ./AppDir/usr/share/icons/hicolor/scalable/apps/grassy.png
+# Copy your files into AppDir
+cp "$ICON" ./AppDir/usr/share/icons/hicolor/256x256/apps/grassy.png
+cp "$ICON" ./AppDir/icon.png
+cp "$ICON" ./AppDir/.DirIcon
 cp "$DESKTOP" ./AppDir/usr/share/applications/
+cp "$DESKTOP" ./AppDir/grassy.desktop
 
-# --- List all binaries and data your app needs ---
-quick-sharun /usr/bin/grassy \
-    /usr/lib/python3.*/site-packages/grassy \
-    /usr/share/grassy \
-    /usr/lib/libgobject* \
-    /usr/lib/libglib* \
-    /usr/lib/libgtk* \
-    /usr/lib/libadwaita* \
-    /usr/lib/girepository* \
-    /usr/lib/libgirepository*
+# Copy your Python script (THIS is what quick-sharun will bundle)
+cp ./grassy.py ./AppDir/usr/bin/grassy
+chmod +x ./AppDir/usr/bin/grassy
 
-# --- If your app is a single Python script (not installed system-wide) ---
-# First check if your script exists
-if [ -f "./grassy.py" ]; then
-    # Copy your script and any local modules into AppDir
-    cp ./grassy.py ./AppDir/bin/grassy
-    chmod +x ./AppDir/bin/grassy
+# --- NOW run quick-sharun on the AppDir contents ---
+# Point it to the python3 binary and your script (both exist in runner)
+quick-sharun /usr/bin/python3 \
+             /usr/lib/python3.*/site-packages/gi \
+             /usr/lib/python3.*/site-packages/requests \
+             /usr/lib/python3.*/site-packages/appdirs \
+             /usr/lib/x86_64-linux-gnu/libgobject* \
+             /usr/lib/x86_64-linux-gnu/libglib* \
+             /usr/lib/x86_64-linux-gnu/libgtk* \
+             /usr/lib/x86_64-linux-gnu/libadwaita* \
+             /usr/lib/x86_64-linux-gnu/girepository-1.0 \
+             /usr/lib/python3/dist-packages/gi \
+             ./AppDir/usr/bin/grassy
 
-    # Create a wrapper script that runs Python with the correct environment
-    cat << 'EOF' > ./AppDir/AppRun
+# --- Create AppRun wrapper that uses bundled python ---
+cat > ./AppDir/AppRun << 'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
-export PYTHONPATH="${HERE}/usr/lib/python3.12/site-packages:${PYTHONPATH:-}"
-exec "${HERE}/bin/python3" "${HERE}/bin/grassy" "$@"
+export PATH="${HERE}/usr/bin:${PATH}"
+export PYTHONPATH="${HERE}/usr/lib/python3/dist-packages:${HERE}/usr/lib/python3.12/site-packages:${PYTHONPATH:-}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"
+export GI_TYPELIB_PATH="${HERE}/usr/lib/girepository-1.0:${GI_TYPELIB_PATH:-}"
+exec "${HERE}/usr/bin/python3" "${HERE}/usr/bin/grassy" "$@"
 EOF
-    chmod +x ./AppDir/AppRun
-elif [ -f "./src/grassy.py" ]; then
-    # Alternative location
-    cp ./src/grassy.py ./AppDir/bin/grassy
-    chmod +x ./AppDir/bin/grassy
-    # ... (rest of wrapper creation)
-else
-    echo "WARNING: grassy.py not found in current directory or ./src/"
-fi
+chmod +x ./AppDir/AppRun
 
-# --- Turn AppDir into AppImage ---
+# --- Build the AppImage ---
 quick-sharun --make-appimage
 
-# --- Test the final app ---
-if ls ./dist/*.AppImage 1>/dev/null 2>&1; then
-    quick-sharun --test ./dist/*.AppImage
-else
-    echo "ERROR: No AppImage found in ./dist/"
-    exit 1
-fi
+# --- Test it ---
+quick-sharun --test ./dist/*.AppImage
