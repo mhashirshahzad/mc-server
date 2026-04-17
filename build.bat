@@ -52,9 +52,9 @@ C:\msys64\usr\bin\pacman.exe -S --needed --noconfirm ^
     mingw-w64-ucrt-x86_64-fontconfig ^
     mingw-w64-ucrt-x86_64-freetype ^
     mingw-w64-ucrt-x86_64-graphene ^
-    mingw-w64-ucrt-x86_64-epoxy ^
     mingw-w64-ucrt-x86_64-libxml2 ^
-    mingw-w64-ucrt-x86_64-sqlite3
+    mingw-w64-ucrt-x86_64-sqlite3 ^
+    mingw-w64-ucrt-x86_64-libepoxy
 
 if errorlevel 1 (
     echo %RED%❌ pacman failed. Try running MSYS2 manually and running:%RESET%

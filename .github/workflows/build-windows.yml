@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - "version.txt"
-      
   workflow_dispatch:
 
 jobs:
@@ -15,13 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Python (needed for venv + PyInstaller)
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # Install MSYS2 (this gives you C:\msys64)
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -37,16 +34,14 @@ jobs:
             mingw-w64-ucrt-x86_64-fontconfig
             mingw-w64-ucrt-x86_64-freetype
             mingw-w64-ucrt-x86_64-graphene
-            mingw-w64-ucrt-x86_64-epoxy
             mingw-w64-ucrt-x86_64-libxml2
             mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-libepoxy
 
-      # Run your build script
       - name: Build with batch script
         shell: cmd
         run: build.bat
 
-      # Upload ZIP artifact
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

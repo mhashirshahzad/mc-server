@@ -23,7 +23,7 @@ GREEN = \033[0;32m
 YELLOW = \033[0;33m
 NC = \033[0m
 
-.PHONY: version setup run clean install uninstall upgrade check dev-install desktop-file update fix-venv binary appimage
+.PHONY: version setup run clean install uninstall upgrade check dev-install desktop-file update fix-venv binary appimage release
 
 version:
 	@echo "$(BINARY_VERSION)"
@@ -67,7 +67,7 @@ appimage:
 	@echo -e "$(YELLOW)Creating AppImage for v$(BINARY_VERSION)...$(NC)"
 	
 	@if [ ! -d "$(DIST_DIR)/$(BINARY_NAME)" ]; then \
-		echo -e "$(RED)❌ Release not found. Run 'make release-linux' first$(NC)"; \
+		echo -e "$(RED)❌ Release not found. Run 'make binary' first$(NC)"; \
 		exit 1; \
 	fi
 	
@@ -91,7 +91,7 @@ appimage:
 	else echo -e "$(YELLOW)⚠ grassy.desktop not found$(NC)"; fi
 	
 	@if [ -f assets/icon.png ]; then cp assets/icon.png $(APPDIR)/grassy.png; \
-	else echo -e "$(YELLOW}⚠ assets/icon.png not found$(NC)"; fi
+	else echo -e "$(YELLOW)⚠ assets/icon.png not found$(NC)"; fi
 	
 	chmod +x $(APPIMAGE_TOOL) 2>/dev/null || true
 	
@@ -116,7 +116,7 @@ clean:
 install:
 	@echo -e "$(YELLOW)Installing to $(INSTALL_PATH)...$(NC)"
 	@if [ ! -f "$(DIST_DIR)/$(BINARY_NAME)/$(BINARY_NAME)" ]; then \
-		echo -e "$(RED)❌ Binary not found. Run 'make release-linux' first$(NC)"; \
+		echo -e "$(RED)❌ Binary not found. Run 'make binary' first$(NC)"; \
 		exit 1; \
 	fi
 	sudo cp -r $(DIST_DIR)/$(BINARY_NAME)/* $(INSTALL_PATH)/
