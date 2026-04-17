@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write      # Required for creating releases
+  contents: write      # Required to create GitHub Releases
 
 jobs:
   build-windows:
@@ -27,9 +27,9 @@ jobs:
         run: |
           bash ./windows/build.sh
 
-      - name: Create portable ZIP archive (onedir)
+      - name: Create portable ZIP archive (whole folder)
         run: |
-          powershell Compress-Archive -Path src\dist\grassy\* -DestinationPath grassy-windows-portable-amd64.zip
+          powershell Compress-Archive -Path src\dist\grassy -DestinationPath grassy-windows-portable-amd64.zip
 
       - name: Upload artifact (ZIP)
         uses: actions/upload-artifact@v4

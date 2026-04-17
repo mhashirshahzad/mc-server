@@ -8,7 +8,7 @@ a = Analysis(
     hiddenimports=['gi', 'gi.repository.Gtk', 'gi.repository.Adw'],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['../windows/rthook.py'],
     excludes=[],
     noarchive=False,
 )
@@ -30,7 +30,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon='../assets/icon.ico',   # Uncomment if you have an icon
 )
 
 coll = COLLECT(
