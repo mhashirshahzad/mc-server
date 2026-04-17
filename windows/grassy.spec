@@ -10,7 +10,6 @@ a = Analysis(
     hooksconfig={
         'gi': {
             'icons': ['Adwaita'],
-            'themes': ['Adwaita'],
             'module-versions': {
                 'Gtk': '4.0',
 		        'Adw': '1'
@@ -49,5 +48,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='variamain',
+    name='main',
 )
