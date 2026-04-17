@@ -1,9 +1,15 @@
 [Desktop Entry]
+Version=1.0
+Type=Application
+
 Name=Grassy
-Comment=A minecraft server manager
+Comment=Minecraft server manager
+
 Exec=grassy
 Icon=grassy
+
 Terminal=false
-Type=Application
-Categories=Utility;Games;
-StartupWMClass=org.bongopoyo.grassy
+Categories=Game;
+StartupNotify=true
+
+StartupWMClass=org.bongo.grassy
