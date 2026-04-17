@@ -14,6 +14,7 @@ pacman -Sy --noconfirm \
     python-requests \
     python-appdirs \
     gtk4 \
+    gtk3 \
     libadwaita \
     gobject-introspection \
     glib2 \

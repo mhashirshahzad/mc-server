@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eu
+#!/bin/bash
+set -euo pipefail
 
 # --- Configuration ---
 BINARY_NAME="grassy"
@@ -8,55 +8,39 @@ APPDIR="$RELEASE_DIR/Grassy.AppDir"
 BUILD_DIR="$RELEASE_DIR/build"
 DIST_DIR="$RELEASE_DIR/dist"
 
-# --- Simple fixed name (no version) ---
 ARCH=$(uname -m)
 FINAL_NAME="${BINARY_NAME}-${ARCH}.AppImage"
 
-export OUTPATH="./dist"
-
-# --- Metadata (Both files are in assets/) ---
-export ICON="$(pwd)/assets/icon.png"
-export DESKTOP="$(pwd)/assets/grassy.desktop"
-
-# --- AppImageTool path ---
+ICON="$(pwd)/assets/icon.png"
+DESKTOP="$(pwd)/assets/grassy.desktop"
 APPIMAGETOOL="$(pwd)/appimagetool-x86_64.AppImage"
 
-echo -e "\033[0;33m🔨 Building Grassy AppImage (using appimagetool)...\033[0m"
+echo "🔨 Building Grassy AppImage (CI-safe)..."
 
-# Verify required files exist
-if [ ! -f "$ICON" ]; then
-    echo -e "\033[0;31m❌ Icon not found at $ICON\033[0m"
-    exit 1
-fi
+# --- Validate assets ---
+[ -f "$ICON" ] || { echo "❌ Missing icon"; exit 1; }
+[ -f "$DESKTOP" ] || { echo "❌ Missing desktop file"; exit 1; }
 
-if [ ! -f "$DESKTOP" ]; then
-    echo -e "\033[0;31m❌ Desktop file not found at $DESKTOP\033[0m"
-    exit 1
-fi
-
-# Verify appimagetool exists
+# --- Fetch appimagetool if missing ---
 if [ ! -f "$APPIMAGETOOL" ]; then
-    echo -e "\033[0;31m❌ appimagetool not found at $APPIMAGETOOL\033[0m"
-    echo -e "\033[0;33m⚠️  Downloading appimagetool...\033[0m"
-    wget -O "$APPIMAGETOOL" https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+    echo "⬇️ Downloading appimagetool..."
+    wget -q -O "$APPIMAGETOOL" \
+        https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
     chmod +x "$APPIMAGETOOL"
 fi
 
-# --- Step 1: Create virtual environment and install dependencies ---
-echo -e "\033[0;33m📦 Setting up Python environment...\033[0m"
-
-# Use a temporary venv in the build directory
+# --- Python environment ---
+echo "📦 Setting up Python..."
 VENV_DIR="$BUILD_DIR/venv"
 python3 -m venv "$VENV_DIR" --clear
 "$VENV_DIR/bin/pip" install --upgrade pip
-"$VENV_DIR/bin/pip" install -r requirements.txt
+"$VENV_DIR/bin/pip" install -r requirements.txt pyinstaller
 
-# Install PyInstaller
-"$VENV_DIR/bin/pip" install pyinstaller
+# --- Force GTK4 awareness ---
+export GI_TYPELIB_PATH="/usr/lib/girepository-1.0"
 
-# --- Step 2: Build with PyInstaller ---
-echo -e "\033[0;33m📦 Building PyInstaller bundle...\033[0m"
-
+# --- Build with PyInstaller ---
+echo "⚙️ Building binary..."
 "$VENV_DIR/bin/python" -m PyInstaller \
     --name "$BINARY_NAME" \
     --onedir \
@@ -67,80 +51,77 @@ echo -e "\033[0;33m📦 Building PyInstaller bundle...\033[0m"
     --hidden-import=gi \
     --hidden-import=gi.repository.Gtk \
     --hidden-import=gi.repository.Adw \
+    --hidden-import=gi.repository.GLib \
     --hidden-import=requests \
     --hidden-import=appdirs \
     src/main.py
 
-# --- Step 3: Prepare AppDir structure ---
-echo -e "\033[0;33m📁 Creating AppDir structure...\033[0m"
-
+# --- AppDir structure ---
+echo "📁 Creating AppDir..."
 rm -rf "$APPDIR"
+
 mkdir -p "$APPDIR/usr/bin"
+mkdir -p "$APPDIR/usr/lib"
 mkdir -p "$APPDIR/usr/share/applications"
 mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
-# Copy PyInstaller bundle
+# Copy binary bundle
 cp -r "$DIST_DIR/$BINARY_NAME"/* "$APPDIR/usr/bin/"
 
-# Copy desktop file (from assets/)
+# --- Minimal GTK runtime (best-effort) ---
+echo "📚 Copying runtime libs..."
+cp /usr/lib/libgtk-4.so* "$APPDIR/usr/lib/" 2>/dev/null || true
+cp /usr/lib/libadwaita-1.so* "$APPDIR/usr/lib/" 2>/dev/null || true
+cp /usr/lib/libglib-2.0.so* "$APPDIR/usr/lib/" 2>/dev/null || true
+cp /usr/lib/libgobject-2.0.so* "$APPDIR/usr/lib/" 2>/dev/null || true
+
+# --- Desktop + icon ---
 cp "$DESKTOP" "$APPDIR/grassy.desktop"
 cp "$DESKTOP" "$APPDIR/usr/share/applications/"
 
-# Copy icon from assets/ to all required locations
 cp "$ICON" "$APPDIR/grassy.png"
-cp "$ICON" "$APPDIR/usr/share/icons/hicolor/256x256/apps/grassy.png"
 cp "$ICON" "$APPDIR/.DirIcon"
+cp "$ICON" "$APPDIR/usr/share/icons/hicolor/256x256/apps/grassy.png"
 
-# --- Step 4: Create AppRun wrapper ---
-echo -e "\033[0;33m🚀 Creating AppRun wrapper...\033[0m"
-
+# --- AppRun ---
+echo "🚀 Creating AppRun..."
 cat > "$APPDIR/AppRun" << 'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "$0")")"
+
 export PATH="$HERE/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
 export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0:$GI_TYPELIB_PATH"
 
-# Execute the binary built by PyInstaller
 exec "$HERE/usr/bin/grassy" "$@"
 EOF
+
 chmod +x "$APPDIR/AppRun"
 
-# --- Step 5: Build AppImage with appimagetool ---
-echo -e "\033[0;33m📀 Creating AppImage with appimagetool...\033[0m"
+# --- Build AppImage (CI-safe: NO FUSE) ---
+echo "📀 Building AppImage..."
 
-# Make appimagetool executable
-chmod +x "$APPIMAGETOOL"
-
-# Build the AppImage (using zstd compression for faster startup)
 "$APPIMAGETOOL" \
+    --appimage-extract-and-run \
     --comp zstd \
     --mksquashfs-opt "-Xcompression-level 6" \
     --mksquashfs-opt "-b 131072" \
     "$APPDIR" \
     "$FINAL_NAME"
 
-# --- Step 6: Organize output ---
+# --- Output ---
 mkdir -p "$RELEASE_DIR"
 
-# Move AppImage to release directory
 if [ -f "$FINAL_NAME" ]; then
     mv "$FINAL_NAME" "$RELEASE_DIR/"
-    echo -e "\033[0;32m✅ AppImage created: $RELEASE_DIR/$FINAL_NAME\033[0m"
-    ls -lh "$RELEASE_DIR/$FINAL_NAME"
+    echo "✅ Created: $RELEASE_DIR/$FINAL_NAME"
 else
-    echo -e "\033[0;31m❌ Failed to create AppImage\033[0m"
+    echo "❌ AppImage build failed"
     exit 1
 fi
 
-# Also handle zsync file if exists
-if ls *.zsync 1>/dev/null 2>&1; then
-    mv *.zsync "$RELEASE_DIR/" 2>/dev/null || true
-fi
+# --- Cleanup ---
+echo "🧹 Cleaning..."
+rm -rf "$BUILD_DIR" "$APPDIR"
 
-# --- Step 7: Cleanup build artifacts ---
-echo -e "\033[0;33m🧹 Cleaning up...\033[0m"
-rm -rf "$BUILD_DIR" 2>/dev/null || true
-rm -rf "$APPDIR" 2>/dev/null || true
-
-echo -e "\033[0;32m✅ Build complete! AppImage is in $RELEASE_DIR/$FINAL_NAME\033[0m"
+echo "🎉 Done."
