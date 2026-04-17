@@ -11,25 +11,17 @@ permissions:
 
 jobs:
   build:
-    name: Build AppImage (${{ matrix.arch }})
-    runs-on: ${{ matrix.runs-on }}
+    name: Build AppImage (arch)
+    runs-on: ubuntu-latest   # host runner (irrelevant now)
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runs-on: ubuntu-22.04
-            arch: x86_64
-
-          # Optional future ARM build
-          # - runs-on: ubuntu-24.04-arm
-          #   arch: aarch64
+    container:
+      image: archlinux:latest
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu)
+      - name: Install dependencies
         run: bash ./linux/get-dependencies.sh
 
       - name: Build AppImage
@@ -38,7 +30,7 @@ jobs:
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AppImage-${{ matrix.arch }}
+          name: AppImage-x86_64
           path: release/
           if-no-files-found: error
 
@@ -59,8 +51,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
