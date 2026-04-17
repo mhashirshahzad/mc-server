@@ -10,7 +10,7 @@ DIST_DIR = $(RELEASE_DIR)/dist
 BUILD_DIR = $(RELEASE_DIR)/build
 APPDIR = $(RELEASE_DIR)/Grassy.AppDir
 
-APPIMAGE_TOOL = ./appimagetool-x86_64.AppImage
+APPIMAGE_TOOL = ./linux/appimagetool-x86_64.AppImage
 
 INSTALL_PATH = /usr/local/bin
 DESKTOP_PATH = $(HOME)/.local/share/applications
@@ -106,6 +106,11 @@ appimage:
 release: binary appimage
 	@echo -e "$(GREEN)Release complete$(NC)"
 
+build-windows:
+	@echo -e "$(GREEN)Using act$(NC)"
+	act -P windows-latest=-self-hosted -j build-windows
+
+	
 install:
 	@if [ ! -f "$(DIST_DIR)/$(BINARY_NAME)/$(BINARY_NAME)" ]; then \
 		echo "Build first"; exit 1; \

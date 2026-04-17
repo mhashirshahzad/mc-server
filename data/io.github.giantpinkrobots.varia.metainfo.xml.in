@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+<name>Varia</name>
+<summary>Download files, videos and torrents</summary>
+<id>io.github.giantpinkrobots.varia</id>
+
+<metadata_license>FSFAP</metadata_license>
+<project_license>MPL-2.0</project_license>
+
+<developer_name>Giant Pink Robots!</developer_name>
+
+<content_rating type="oars-1.1" />
+<url type="homepage">https://giantpinkrobots.github.io/varia</url>
+<url type="vcs-browser">https://github.com/giantpinkrobots/varia</url>
+<url type="translate">https://hosted.weblate.org/projects/varia/glossary/</url>
+<url type="bugtracker">https://github.com/giantpinkrobots/varia/issues</url>
+
+<languages>
+<lang>ar_SA</lang>
+<lang>bg_BG</lang>
+<lang>ca_ES</lang>
+<lang>de_DE</lang>
+<lang>en_US</lang>
+<lang>es_ES</lang>
+<lang>et_EE</lang>
+<lang>fa_IR</lang>
+<lang>fi_FI</lang>
+<lang>fr_FR</lang>
+<lang>he_IL</lang>
+<lang>hi_IN</lang>
+<lang>hu_HU</lang>
+<lang>id_ID</lang>
+<lang>it_IT</lang>
+<lang>ja_JP</lang>
+<lang>nb_NO</lang>
+<lang>nl_NL</lang>
+<lang>oc_FR</lang>
+<lang>pl_PL</lang>
+<lang>pt_BR</lang>
+<lang>ru_RU</lang>
+<lang>sk_SK</lang>
+<lang>ta_IN</lang>
+<lang>tr_TR</lang>
+<lang>uk_UA</lang>
+<lang>vi_VN</lang>
+<lang>zh_CN</lang>
+<lang>zh_TW</lang>
+</languages>
+
+<branding>
+<color type="primary" scheme_preference="light">#DBE8F5</color>
+<color type="primary" scheme_preference="dark">#010E1D</color>
+</branding>
+
+<description>
+<p>
+Varia is better than your browser at downloading stuff.
+</p>
+<p>
+Supporting videos and torrents on top of just regular files, and with a variety of advanced features wrapped inside an easy to understand interface, Varia is both quite powerful and dead simple to use:
+</p>
+<ul>
+<li>
+Download anything you want quickly - potentially faster than your browser, continue incomplete downloads even after reboots
+</li>
+<li>
+Download video and audio (as well as whole playlists) from thousands of websites (anything supported by yt-dlp) including YouTube, TikTok, Twitter etc
+</li>
+<li>
+Integrate with Firefox and Chrome (or any Chromium based browser like Brave or Opera) to redirect downloads
+</li>
+<li>
+Schedule downloads with a powerful scheduler function allowing for custom timespans for each day of the week
+</li>
+<li>
+Download from protected areas with basic auth and cookies.txt import support, as well as an option to automatically transfer your browser cookies through the extension
+</li>
+<li>
+Control a remote aria2 instance running on any server through Remote Mode
+</li>
+</ul>
+</description>
+
+<launchable type="desktop-id">io.github.giantpinkrobots.varia.desktop</launchable>
+<translation type="gettext">varia</translation>
+<screenshots>
+<screenshot type="default">
+<caption>Main window</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-1.png</image>
+</screenshot>
+<screenshot>
+<caption>Video/audio download dialog</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-2.png</image>
+</screenshot>
+<screenshot>
+<caption>Scheduler setting dialog</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-3.png</image>
+</screenshot>
+<screenshot>
+<caption>Playlist download dialog</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-4.png</image>
+</screenshot>
+<screenshot>
+<caption>Torrent download dialog</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-5.png</image>
+</screenshot>
+<screenshot>
+<caption>Preferences dialog</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-6.png</image>
+</screenshot>
+<screenshot>
+<caption>Main window in dark mode</caption>
+<image>https://raw.githubusercontent.com/giantpinkrobots/varia/main/screenshots/Screenshot-Varia-7.png</image>
+</screenshot>
+</screenshots>
+
+<requires>
+<display_length compare="ge">360</display_length>
+</requires>
+
+<supports>
+<control>keyboard</control>
+<control>pointing</control>
+<control>touch</control>
+</supports>
+
+<releases>
+<release version="v2026.3.27-1" date="2026-03-27">
+<description translatable="yes">
+<ul><li>Ability to download playlists through the same Video/Audio functionality</li>
+        <li>Ability to select individual files and folders to download through torrenting</li>
+        <li>Option to dynamically send browser cookies through the browser extension upon each download (separate from cookies.txt file import support)</li></ul>
+</description>
+</release>
+</releases>
+</component>
