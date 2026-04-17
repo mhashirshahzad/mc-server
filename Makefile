@@ -96,7 +96,7 @@ appimage:
 	chmod +x $(APPIMAGE_TOOL) 2>/dev/null || true
 
 	@if [ -f $(APPIMAGE_TOOL) ]; then \
-		$(APPIMAGE_TOOL) $(APPDIR) $(RELEASE_DIR)/$(BINARY_NAME)-$(BINARY_VERSION)-x86_64.AppImage; \
+		$(APPIMAGE_TOOL) $(APPDIR) $(RELEASE_DIR)/$(BINARY_NAME)-x86_64.AppImage; \
 		echo "OK AppImage built"; \
 	else \
 		echo "Missing appimagetool"; \
