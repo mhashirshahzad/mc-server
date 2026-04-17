@@ -3,7 +3,8 @@ name: Build and Release Windows Binary
 on:
   push:
     tags:
-      - 'v*'  # Triggers on version tags like v1.0.0
+      - 'v*'
+  workflow_dispatch:   # Allows manual trigger from Actions tab
 
 jobs:
   build-windows:
@@ -25,7 +26,7 @@ jobs:
 
       - name: Create portable ZIP archive
         run: |
-          powershell Compress-Archive -Path src\dist\grassy\* -DestinationPath grassy-windows-portable-amd64.zip
+          powershell Compress-Archive -Path src\dist\grassy.exe -DestinationPath grassy-windows-portable-amd64.zip
 
       - name: Upload artifact (ZIP)
         uses: actions/upload-artifact@v4

@@ -1,12 +1,7 @@
 #!/bin/bash
 shopt -s extglob
 
-# --- Configuration ---
-# (No external binaries like aria2/ffmpeg needed for Grassy)
-# Just ensure Python and GTK dependencies are installed
-
-# --- Install MSYS2 Dependencies ---
-echo " - Installing dependencies..."
+echo " - Installing MSYS2 dependencies..."
 pacman -S --noconfirm --needed \
     mingw-w64-ucrt-x86_64-python \
     mingw-w64-ucrt-x86_64-gtk4 \
@@ -18,16 +13,17 @@ pacman -S --noconfirm --needed \
     mingw-w64-ucrt-x86_64-7zip \
     unzip
 
-# --- Install Python Dependencies ---
-echo " - Installing Python packages..."
-pip install -r requirements.txt
-
-# --- Build with PyInstaller ---
-echo " - Building Windows executable..."
+echo " - Setting up Python virtual environment..."
 cd src
-# Use a PyInstaller spec file for better control (see step 2)
+python -m venv venv
+source venv/bin/activate
+
+echo " - Installing Python packages..."
+pip install --upgrade pip
+pip install -r ../requirements.txt
+
+echo " - Building Windows executable with PyInstaller..."
 pyinstaller grassy.spec
-cd ..
 
 echo " - Build complete."
-echo " - Executable can be found in src/dist/grassy/"
+echo " - Executable: src/dist/grassy.exe"
