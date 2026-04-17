@@ -22,11 +22,8 @@ echo " - Upgrading pip..."
 python -m pip install --upgrade pip
 
 echo " - Installing Python packages..."
-pip install -r ../requirements.txt
+pip install -r requirements.txt
 
 echo " - Building Windows executable with PyInstaller..."
-cd ..
 pyinstaller windows/grassy.spec
-
 echo " - Build complete."
-echo " - Output: dist/main/"
