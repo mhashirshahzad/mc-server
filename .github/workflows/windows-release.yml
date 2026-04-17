@@ -7,11 +7,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write      # Required to create GitHub Releases
+  contents: write
 
 jobs:
   build-windows:
     runs-on: windows-latest
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -27,22 +28,22 @@ jobs:
         run: |
           bash ./windows/build.sh
 
-      - name: Create portable ZIP archive (whole folder)
+      - name: Create portable ZIP archive (7-Zip, POSIX-safe)
         run: |
-          powershell Compress-Archive -Path src\dist\grassy -DestinationPath grassy-windows-portable-amd64.zip
+          cd release\dist
+          7z a -tzip ..\..\grassy-windows-portable-amd64.zip grassy
 
       - name: Upload artifact (ZIP)
         uses: actions/upload-artifact@v4
         with:
           name: Grassy-Windows-Portable
           path: grassy-windows-portable-amd64.zip
-          compression-level: 9
+          compression-level: 0
 
       - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            grassy-windows-portable-amd64.zip
+          files: grassy-windows-portable-amd64.zip
           draft: false
           prerelease: false
           generate_release_notes: true
