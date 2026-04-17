@@ -3,7 +3,7 @@ set -eu
 
 echo "📦 installing minimal arch build deps..."
 
-pacman -sy --noconfirm \
+pacman -Sy --noconfirm \
     python \
     python-pip \
     python-requests \
