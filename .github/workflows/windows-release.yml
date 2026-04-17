@@ -30,7 +30,7 @@ jobs:
 
       - name: Create portable ZIP archive (7-Zip, POSIX-safe)
         run: |
-          cd release\dist
+          cd src\dist
           7z a -tzip ..\..\grassy-windows-portable-amd64.zip grassy
 
       - name: Upload artifact (ZIP)
