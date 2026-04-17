@@ -17,6 +17,8 @@ pacman -Syu --noconfirm \
     base-devel
 
 # Install any extra Python packages from requirements.txt (if not already covered by pacman)
-pip install --no-cache-dir -r requirements.txt
+
+# this breaks dont do this
+# pip install --no-cache-dir -r requirements.txt
 
 echo "All dependencies installed successfully."
