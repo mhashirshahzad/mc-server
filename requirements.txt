@@ -1,0 +1,4 @@
+pygobject
+requests
+appdirs
+python-lsp-server

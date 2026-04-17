@@ -2,30 +2,22 @@ VENV = venv
 PYTHON = $(VENV)/bin/python3
 PIP = $(VENV)/bin/pip3
 BINARY_NAME = grassy
-BINARY_VERSION = 1.0.1
-
+BINARY_VERSION = 1.1.0
 RELEASE_DIR = release
 DIST_DIR = $(RELEASE_DIR)/dist
 BUILD_DIR = $(RELEASE_DIR)/build
 APPDIR = $(RELEASE_DIR)/Grassy.AppDir
 APPIMAGE_TOOL = ./appimagetool-x86_64.AppImage
-
 INSTALL_PATH = /usr/local/bin
 DESKTOP_PATH = $(HOME)/.local/share/applications
-
 # Colors
 RED = \033[0;31m
 GREEN = \033[0;32m
 YELLOW = \033[0;33m
 NC = \033[0m
-
 .PHONY: version setup run clean install uninstall upgrade check dev-install desktop-file update fix-venv release-linux appimage
-
-
 version:
 	@echo $(BINARY_VERSION)
-
-
 setup:
 	@echo -e "$(YELLOW)Setting up virtual environment...$(NC)"
 	@if ! python3 -c "import venv" 2>/dev/null; then \
@@ -34,25 +26,17 @@ setup:
 	fi
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
-	$(PIP) install pygobject requests appdirs python-lsp-server
+	$(PIP) install -r requirements.txt
 	@echo -e "$(GREEN)✅ Setup complete$(NC)"
-
-
 run:
 	@echo -e "$(YELLOW)Running...$(NC)"
 	@if [ ! -f "$(PYTHON)" ]; then $(MAKE) setup; fi
 	$(PYTHON) src/main.py
-
-
 release-linux:
 	@echo -e "$(YELLOW)Building release binary...$(NC)"
-
 	@if [ ! -f "$(PYTHON)" ]; then $(MAKE) setup; fi
-
-	$(PIP) install pyinstaller
-
+	$(PIP) install pyinstaller -r requirements.txt
 	rm -rf $(RELEASE_DIR)
-
 	$(PYTHON) -m PyInstaller \
 		--name $(BINARY_NAME) \
 		--onedir \
@@ -64,10 +48,8 @@ release-linux:
 		--hidden-import=gi.repository.Gtk \
 		--hidden-import=gi.repository.Adw \
 		src/main.py
-
 	@echo -e "$(GREEN)✅ Release built in $(RELEASE_DIR)$(NC)"
 	make appimage
-
 appimage:
 	@echo -e "$(YELLOW)Creating AppImage...$(NC)"
 	
