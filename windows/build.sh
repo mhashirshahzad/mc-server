@@ -18,17 +18,15 @@ pacman -S --noconfirm --needed \
     base-devel \
     unzip
 
-echo " - Setting up Python virtual environment..."
-cd src
-python -m venv venv
-source venv/bin/activate
+echo " - Upgrading pip..."
+python -m pip install --upgrade pip
 
 echo " - Installing Python packages..."
-pip install --upgrade pip
 pip install -r ../requirements.txt
 
 echo " - Building Windows executable with PyInstaller..."
-pyinstaller ../windows/grassy.spec
+cd ..
+pyinstaller windows/grassy.spec
 
 echo " - Build complete."
-echo " - Executable: src/dist/grassy.exe"
+echo " - Output: dist/main/"
